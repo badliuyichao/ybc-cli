@@ -1,0 +1,849 @@
+openapi: 3.0.3
+info:
+  title: ybc - 用友 BIP OpenAPI
+  description: |
+    用友 BIP OpenAPI 平台 CLI 工具的 API 规范定义。
+
+    本规范定义了用友 BIP 平台的核心 API 端点，包括：
+    - 人员管理（staff）：员工信息查询、启用、禁用
+    - 待办事项（todo）：待办列表查询、创建
+
+    ## 认证方式
+    所有 API 调用需要在请求头中携带 Bearer Token：
+    ```
+    Authorization: Bearer <your_access_token>
+    ```
+
+    Token 通过 AK/SK 签名机制获取，详见鉴权文档。
+
+    ## 错误处理
+    API 返回统一的错误响应格式：
+    ```json
+    {
+      "code": "ERROR_CODE",
+      "message": "错误描述",
+      "details": {}
+    }
+    ```
+
+  version: 1.0.0
+  contact:
+    name: 用友 BIP 开发团队
+    email: support@yonyou.com
+    url: https://openapi.yonyoucloud.com
+
+servers:
+  - url: https://openapi-sit.yonyoucloud.com
+    description: 沙箱环境（测试）
+  - url: https://openapi.yonyoucloud.com
+    description: 生产环境
+
+security:
+  - bearerAuth: []
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: |
+        Bearer Token 认证。
+
+        通过 AK/SK 签名获取 access_token，然后在请求头中携带：
+        ```
+        Authorization: Bearer <access_token>
+        ```
+
+  schemas:
+    # ==================== 通用模型 ====================
+    ApiResponse:
+      type: object
+      properties:
+        code:
+          type: string
+          description: 响应码
+          example: "0"
+        message:
+          type: string
+          description: 响应消息
+          example: "操作成功"
+        data:
+          type: object
+          description: 响应数据
+      required:
+        - code
+        - message
+
+    ErrorResponse:
+      type: object
+      properties:
+        code:
+          type: string
+          description: 错误码
+          example: "ERROR_CODE"
+        message:
+          type: string
+          description: 错误消息
+          example: "操作失败"
+        details:
+          type: object
+          description: 错误详情
+      required:
+        - code
+        - message
+
+    Pagination:
+      type: object
+      properties:
+        page:
+          type: integer
+          description: 当前页码（从 1 开始）
+          example: 1
+        pageSize:
+          type: integer
+          description: 每页记录数
+          example: 20
+        total:
+          type: integer
+          description: 总记录数
+          example: 100
+        totalPages:
+          type: integer
+          description: 总页数
+          example: 5
+      required:
+        - page
+        - pageSize
+        - total
+        - totalPages
+
+    # ==================== 人员管理模型 ====================
+    Staff:
+      type: object
+      properties:
+        id:
+          type: string
+          description: 员工 ID
+          example: "1001"
+        name:
+          type: string
+          description: 员工姓名
+          example: "张三"
+        code:
+          type: string
+          description: 员工编码
+          example: "EMP001"
+        department:
+          type: string
+          description: 部门名称
+          example: "技术部"
+        position:
+          type: string
+          description: 职位
+          example: "高级工程师"
+        email:
+          type: string
+          description: 邮箱
+          example: "zhangsan@example.com"
+        phone:
+          type: string
+          description: 手机号
+          example: "13800138000"
+        status:
+          type: string
+          enum: [active, inactive]
+          description: 员工状态
+          example: "active"
+        createdAt:
+          type: string
+          format: date-time
+          description: 创建时间
+          example: "2024-01-01T00:00:00Z"
+        updatedAt:
+          type: string
+          format: date-time
+          description: 更新时间
+          example: "2024-01-01T00:00:00Z"
+      required:
+        - id
+        - name
+        - code
+        - status
+
+    StaffQueryRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          description: 员工姓名（模糊查询）
+          example: "张"
+        code:
+          type: string
+          description: 员工编码
+          example: "EMP001"
+        department:
+          type: string
+          description: 部门名称
+          example: "技术部"
+        status:
+          type: string
+          enum: [active, inactive]
+          description: 员工状态
+          example: "active"
+        page:
+          type: integer
+          description: 页码（从 1 开始）
+          example: 1
+          default: 1
+        pageSize:
+          type: integer
+          description: 每页记录数
+          example: 20
+          default: 20
+
+    StaffQueryResponse:
+      allOf:
+        - $ref: '#/components/schemas/ApiResponse'
+        - type: object
+          properties:
+            data:
+              type: object
+              properties:
+                list:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/Staff'
+                pagination:
+                  $ref: '#/components/schemas/Pagination'
+
+    # 员工详情响应模型（根据 API 文档）
+    StaffDetailResponse:
+      type: object
+      properties:
+        code:
+          type: string
+          description: 返回码，调用成功时返回 200
+          example: "200"
+        message:
+          type: string
+          description: 调用失败时的错误信息
+          example: ""
+        data:
+          type: object
+          description: 调用成功时的返回数据
+          properties:
+            id:
+              type: string
+              description: 员工主键 ID
+            code:
+              type: string
+              description: 员工编码
+            name:
+              type: string
+              description: 员工姓名
+            enable:
+              type: integer
+              description: 员工状态：0 初始态、1 已启用、2 已停用
+              example: 1
+            mobile:
+              type: string
+              description: 手机号
+            email:
+              type: string
+              description: 邮箱
+            sex:
+              type: string
+              description: 性别：1 男、2 女、0 不限
+            cert_type:
+              type: string
+              description: 证件类型 ID
+            cert_type_name:
+              type: string
+              description: 证件类型名称
+            cert_no:
+              type: string
+              description: 证件号
+            photo:
+              type: string
+              description: 头像
+            officetel:
+              type: string
+              description: 办公电话
+            remark:
+              type: string
+              description: 备注
+            birthdate:
+              type: string
+              description: 出生日期
+            user_id:
+              type: string
+              description: 关联用户
+            account_org_id:
+              type: string
+              description: 会计主体
+            biz_man_tag:
+              type: string
+              description: 业务员标识
+            shop_assis_tag:
+              type: string
+              description: 店员标识
+            pubts:
+              type: string
+              description: 时间戳，格式 yyyy-MM-dd HH:mm:ss
+            mainJobList:
+              type: array
+              description: 员工任职信息
+              items:
+                $ref: '#/components/schemas/StaffJobInfo'
+            ptJobList:
+              type: array
+              description: 员工兼职信息
+              items:
+                $ref: '#/components/schemas/StaffJobInfo'
+            bankAcctList:
+              type: array
+              description: 员工银行账号
+              items:
+                $ref: '#/components/schemas/StaffBankAccount'
+
+    StaffJobInfo:
+      type: object
+      description: 任职/兼职信息
+      properties:
+        id:
+          type: string
+          description: 记录主键 ID
+        staff_id:
+          type: string
+          description: 员工 ID
+        org_id:
+          type: string
+          description: 组织 ID
+        org_id_name:
+          type: string
+          description: 组织名称
+        dept_id:
+          type: string
+          description: 部门 ID
+        dept_id_name:
+          type: string
+          description: 部门名称
+        psncl_id:
+          type: string
+          description: 人员类别 ID
+        psncl_id_name:
+          type: string
+          description: 人员类别名称
+        job_id:
+          type: string
+          description: 职务 ID
+        job_id_name:
+          type: string
+          description: 职务名称
+        post_id:
+          type: string
+          description: 岗位 ID
+        post_id_name:
+          type: string
+          description: 岗位名称
+        jobgrade_id:
+          type: string
+          description: 职级 ID
+        jobgrade_id_name:
+          type: string
+          description: 职级名称
+        director:
+          type: string
+          description: 上级主管 ID
+        director_name:
+          type: string
+          description: 上级主管名称
+        begindate:
+          type: string
+          description: 任职开始日期
+        enddate:
+          type: string
+          description: 任职结束日期
+        responsibilities:
+          type: string
+          description: 岗位职责
+        pubts:
+          type: string
+          description: 时间戳
+        dr:
+          type: string
+          description: 删除标志
+
+    StaffBankAccount:
+      type: object
+      description: 银行账号信息
+      properties:
+        id:
+          type: string
+          description: 记录主键 ID
+        staff_id:
+          type: string
+          description: 员工 ID
+        account:
+          type: string
+          description: 银行账号
+        accountname:
+          type: string
+          description: 账户名
+        bank:
+          type: string
+          description: 开户行 ID
+        bank_name:
+          type: string
+          description: 开户行名称
+        bankname:
+          type: string
+          description: 银行名称 ID
+        bankname_name:
+          type: string
+          description: 银行名称
+        currency:
+          type: string
+          description: 币种 ID
+        currency_name:
+          type: string
+          description: 币种名称
+        accttype:
+          type: string
+          description: 账号类型
+        isdefault:
+          type: string
+          description: 是否默认账号
+        memo:
+          type: string
+          description: 备注
+        pubts:
+          type: string
+          description: 时间戳
+        dr:
+          type: string
+          description: 删除标志
+        enable:
+          type: string
+          description: 启用状态
+
+    StaffEnableResponse:
+      allOf:
+        - $ref: '#/components/schemas/ApiResponse'
+        - type: object
+          properties:
+            data:
+              type: object
+              properties:
+                id:
+                  type: string
+                  description: 员工 ID
+                status:
+                  type: string
+                  description: 新状态
+
+    # ==================== 待办事项模型 ====================
+    Todo:
+      type: object
+      properties:
+        id:
+          type: string
+          description: 待办 ID
+          example: "TODO001"
+        title:
+          type: string
+          description: 待办标题
+          example: "完成项目报告"
+        description:
+          type: string
+          description: 待办描述
+          example: "编写第一季度项目进展报告"
+        priority:
+          type: string
+          enum: [high, medium, low]
+          description: 优先级
+          example: "high"
+        status:
+          type: string
+          enum: [pending, in_progress, completed]
+          description: 待办状态
+          example: "pending"
+        assignee:
+          type: string
+          description: 负责人
+          example: "张三"
+        dueDate:
+          type: string
+          format: date
+          description: 截止日期
+          example: "2024-03-31"
+        createdAt:
+          type: string
+          format: date-time
+          description: 创建时间
+          example: "2024-01-01T00:00:00Z"
+        updatedAt:
+          type: string
+          format: date-time
+          description: 更新时间
+          example: "2024-01-01T00:00:00Z"
+      required:
+        - id
+        - title
+        - status
+
+    TodoListRequest:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [pending, in_progress, completed]
+          description: 待办状态筛选
+          example: "pending"
+        priority:
+          type: string
+          enum: [high, medium, low]
+          description: 优先级筛选
+          example: "high"
+        assignee:
+          type: string
+          description: 负责人筛选
+          example: "张三"
+        page:
+          type: integer
+          description: 页码（从 1 开始）
+          example: 1
+          default: 1
+        pageSize:
+          type: integer
+          description: 每页记录数
+          example: 20
+          default: 20
+
+    TodoListResponse:
+      allOf:
+        - $ref: '#/components/schemas/ApiResponse'
+        - type: object
+          properties:
+            data:
+              type: object
+              properties:
+                list:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/Todo'
+                pagination:
+                  $ref: '#/components/schemas/Pagination'
+
+    TodoCreateRequest:
+      type: object
+      properties:
+        title:
+          type: string
+          description: 待办标题
+          example: "完成项目报告"
+        description:
+          type: string
+          description: 待办描述
+          example: "编写第一季度项目进展报告"
+        priority:
+          type: string
+          enum: [high, medium, low]
+          description: 优先级
+          example: "high"
+          default: "medium"
+        assignee:
+          type: string
+          description: 负责人
+          example: "张三"
+        dueDate:
+          type: string
+          format: date
+          description: 截止日期
+          example: "2024-03-31"
+      required:
+        - title
+
+    TodoCreateResponse:
+      allOf:
+        - $ref: '#/components/schemas/ApiResponse'
+        - type: object
+          properties:
+            data:
+              $ref: '#/components/schemas/Todo'
+
+paths:
+  # ==================== 人员管理 API ====================
+  # 员工详情查询 API（简版员工专用）
+  /yonbip/digitalModel/staff/detail:
+    get:
+      tags:
+        - staff
+      summary: 查询员工详情
+      description: |
+        查询员工详细信息（简版员工专用）。
+
+        **注意**：对于购买了核心人力的客户，请使用"获取员工详细信息 MDD 接口"。
+
+        id 和 code 至少传其一，用于唯一确定要查询的员工。
+      operationId: queryStaff
+      parameters:
+        - name: id
+          in: query
+          description: 业务数据 ID（id 和 code 至少传其一）
+          schema:
+            type: string
+        - name: code
+          in: query
+          description: 业务数据人员 code（id 和 code 至少传其一）
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 查询成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StaffDetailResponse'
+              example:
+                code: "200"
+                message: ""
+                data:
+                  id: "1001"
+                  code: "EMP001"
+                  name: "张三"
+                  enable: 1
+                  mobile: "13800138000"
+                  email: "zhangsan@example.com"
+                  sex: "1"
+                  mainJobList:
+                    - org_id: "org001"
+                      org_id_name: "总公司"
+                      dept_id: "dept001"
+                      dept_id_name: "技术部"
+                      post_id: "post001"
+                      post_id_name: "高级工程师"
+                  ptJobList: []
+                  bankAcctList: []
+        '400':
+          description: 请求参数错误
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: 未授权（token 无效或过期）
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /staff/{id}/enable:
+    post:
+      tags:
+        - staff
+      summary: 启用员工
+      description: 启用指定 ID 的员工账号
+      operationId: enableStaff
+      parameters:
+        - name: id
+          in: path
+          description: 员工 ID
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 启用成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StaffEnableResponse'
+              example:
+                code: "0"
+                message: "启用成功"
+                data:
+                  id: "1001"
+                  status: "active"
+        '404':
+          description: 员工不存在
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: 未授权
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /staff/{id}/disable:
+    post:
+      tags:
+        - staff
+      summary: 禁用员工
+      description: 禁用指定 ID 的员工账号
+      operationId: disableStaff
+      parameters:
+        - name: id
+          in: path
+          description: 员工 ID
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 禁用成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StaffEnableResponse'
+              example:
+                code: "0"
+                message: "禁用成功"
+                data:
+                  id: "1001"
+                  status: "inactive"
+        '404':
+          description: 员工不存在
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: 未授权
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  # ==================== 待办事项 API ====================
+  /todo/list:
+    get:
+      tags:
+        - todo
+      summary: 获取待办列表
+      description: 查询待办事项列表，支持按状态、优先级、负责人筛选和分页
+      operationId: listTodos
+      parameters:
+        - name: status
+          in: query
+          description: 待办状态筛选
+          schema:
+            type: string
+            enum: [pending, in_progress, completed]
+        - name: priority
+          in: query
+          description: 优先级筛选
+          schema:
+            type: string
+            enum: [high, medium, low]
+        - name: assignee
+          in: query
+          description: 负责人筛选
+          schema:
+            type: string
+        - name: page
+          in: query
+          description: 页码（从 1 开始）
+          schema:
+            type: integer
+            default: 1
+        - name: pageSize
+          in: query
+          description: 每页记录数
+          schema:
+            type: integer
+            default: 20
+      responses:
+        '200':
+          description: 查询成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TodoListResponse'
+              example:
+                code: "0"
+                message: "查询成功"
+                data:
+                  list:
+                    - id: "TODO001"
+                      title: "完成项目报告"
+                      description: "编写第一季度项目进展报告"
+                      priority: "high"
+                      status: "pending"
+                      assignee: "张三"
+                      dueDate: "2024-03-31"
+                      createdAt: "2024-01-01T00:00:00Z"
+                      updatedAt: "2024-01-01T00:00:00Z"
+                  pagination:
+                    page: 1
+                    pageSize: 20
+                    total: 1
+                    totalPages: 1
+        '401':
+          description: 未授权
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /todo/create:
+    post:
+      tags:
+        - todo
+      summary: 创建待办
+      description: 创建新的待办事项
+      operationId: createTodo
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TodoCreateRequest'
+            example:
+              title: "完成项目报告"
+              description: "编写第一季度项目进展报告"
+              priority: "high"
+              assignee: "张三"
+              dueDate: "2024-03-31"
+      responses:
+        '200':
+          description: 创建成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TodoCreateResponse'
+              example:
+                code: "0"
+                message: "创建成功"
+                data:
+                  id: "TODO001"
+                  title: "完成项目报告"
+                  description: "编写第一季度项目进展报告"
+                  priority: "high"
+                  status: "pending"
+                  assignee: "张三"
+                  dueDate: "2024-03-31"
+                  createdAt: "2024-01-01T00:00:00Z"
+                  updatedAt: "2024-01-01T00:00:00Z"
+        '400':
+          description: 请求参数错误
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: 未授权
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+tags:
+  - name: staff
+    description: 人员管理 API，包括员工信息查询、启用、禁用等操作
+  - name: todo
+    description: 待办事项 API，包括待办列表查询、创建等操作
