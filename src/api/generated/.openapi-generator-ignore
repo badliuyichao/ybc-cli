@@ -21,3 +21,17 @@
 #docs/*.md
 # Then explicitly reverse the ignore rule for a single file:
 #!docs/README.md
+
+# YBC 项目特定配置：忽略不需要的生成文件
+# git_push.sh 是用于推送到独立仓库的脚本，本项目不需要
+git_push.sh
+
+# package.json 是独立 npm 包定义，本项目作为主项目的一部分，不需要独立包定义
+package.json
+
+# tsconfig 文件由主项目管理，不需要独立的编译配置
+tsconfig.json
+tsconfig.esm.json
+
+# .npmignore 用于独立 npm 包发布，本项目不需要
+.npmignore
