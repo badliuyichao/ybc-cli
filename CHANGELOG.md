@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.1.7] - 2026-06-11
+
+### Added
+- **版本更新检查**：启动时异步检查 npm 最新版本，发现新版本时提示用户更新
+  - 使用缓存机制，24小时内只检查一次，避免频繁请求 npm registry
+  - 支持 `--no-update-check` 选项禁用检查
+  - 静默失败机制，网络错误不影响正常使用
+
 ## [0.1.1] - 2026-04-29
 
 ### Fixed

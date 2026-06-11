@@ -17,7 +17,8 @@ export function createProgram(): Command {
     .option('--dry-run', '预览请求而不发送')
     .option('--verbose', '输出详细调试日志')
     .option('--no-color', '禁用颜色')
-    .option('--help-json', '输出 JSON Schema 格式的帮助信息');
+    .option('--help-json', '输出 JSON Schema 格式的帮助信息')
+    .option('--no-update-check', '禁用启动时版本更新检查');
 
   return program;
 }

@@ -3,6 +3,7 @@ import { setupGlobalErrorHandler, ErrorHandler } from '../services/error';
 import { registerConfigCommand } from './commands/config';
 import { registerStaffApiCommands } from './commands/generated/staff';
 import { registerTodoApiCommands } from './commands/generated/todo';
+import { UpdateChecker } from '../services/update';
 
 /**
  * CLI 启动函数
@@ -32,6 +33,15 @@ export async function bootstrap(): Promise<void> {
   try {
     // 解析命令行参数
     program.parse(process.argv);
+
+    // 异步检查版本更新（不阻塞 CLI 执行）
+    const options = program.opts();
+    if (!options.noUpdateCheck) {
+      // 静默检查更新，不阻塞主流程
+      UpdateChecker.checkForUpdates(true).catch(() => {
+        // 静默失败
+      });
+    }
   } catch (error) {
     // 处理解析错误
     const errorHandler = ErrorHandler.getInstance();
