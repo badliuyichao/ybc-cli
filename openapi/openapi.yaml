@@ -49,12 +49,14 @@ components:
       scheme: bearer
       bearerFormat: JWT
       description: |
-        Bearer Token 认证。
+        appKey/appSecret + HmacSHA256 签名认证。
 
-        通过 AK/SK 签名获取 access_token，然后在请求头中携带：
+        通过查询数据中心域名 → HmacSHA256 签名 → GET access_token。
+        业务接口调用时，access_token 作为 query 参数传递：
         ```
-        Authorization: Bearer <access_token>
+        ?access_token=<access_token>&<业务参数>
         ```
+        详见 docs/design/architecture.md §5。
 
   schemas:
     # ==================== 通用模型 ====================

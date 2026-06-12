@@ -165,14 +165,14 @@ npm run validate:openapi
 
 ## 认证
 
-所有 API 调用需要 Bearer Token 认证：
+通过 appKey/appSecret + HmacSHA256 签名获取 access_token，然后在请求 query 参数中携带：
 
-```yaml
-security:
-  - bearerAuth: []
+```
+?access_token=<access_token>&<业务参数>
 ```
 
-Token 通过 AK/SK 签名机制从用友 BIP 平台获取，详见鉴权文档。
+Token 获取流程：查询数据中心域名 → HmacSHA256 签名 → GET access_token。
+详见 `docs/design/architecture.md` §5 鉴权机制。
 
 ## 下一步
 

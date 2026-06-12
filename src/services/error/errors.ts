@@ -65,7 +65,7 @@ export class CliError extends Error implements ICliError {
 /**
  * 鉴权错误
  *
- * 用于 AK/SK 无效、token 获取失败、token 刷新失败等鉴权相关问题
+ * 用于 appKey/appSecret 无效、token 获取失败、token 刷新失败等鉴权相关问题
  */
 export class AuthError extends CliError {
   public readonly authDetails: AuthErrorDetails;

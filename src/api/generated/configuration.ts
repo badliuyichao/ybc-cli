@@ -1,7 +1,7 @@
 /* tslint:disable */
 /**
  * ybc - 用友 BIP OpenAPI
- * 用友 BIP OpenAPI 平台 CLI 工具的 API 规范定义。  本规范定义了用友 BIP 平台的核心 API 端点，包括： - 人员管理（staff）：员工信息查询、启用、禁用 - 待办事项（todo）：待办列表查询、创建  ## 认证方式 所有 API 调用需要在请求头中携带 Bearer Token： ``` Authorization: Bearer <your_access_token> ```  Token 通过 AK/SK 签名机制获取，详见鉴权文档。  ## 错误处理 API 返回统一的错误响应格式： ```json {   \"code\": \"ERROR_CODE\",   \"message\": \"错误描述\",   \"details\": {} } ``` 
+ * 用友 BIP OpenAPI 平台 CLI 工具的 API 规范定义。  本规范定义了用友 BIP 平台的核心 API 端点，包括： - 人员管理（staff）：员工信息查询、启用、禁用 - 待办事项（todo）：待办列表查询、创建  ## 认证方式 通过 appKey/appSecret + HmacSHA256 签名获取 access_token，然后在请求 query 参数中携带： ``` ?access_token=<access_token>&<业务参数> ```  Token 获取流程：查询数据中心域名 → HmacSHA256 签名 → GET access_token。 详见 docs/design/architecture.md §5 鉴权机制。  ## 错误处理 API 返回统一的错误响应格式： ```json {   \"code\": \"ERROR_CODE\",   \"message\": \"错误描述\",   \"details\": {} } ``` 
  *
  * The version of the OpenAPI document: 1.0.0
  * Contact: support@yonyou.com
