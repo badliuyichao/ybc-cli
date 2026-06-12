@@ -42,7 +42,7 @@ Infrastructure 层 (存储、加密、HTTP)
 - **API 层**：从 OpenAPI 规范自动生成的 TypeScript 客户端 + 业务命令封装
 - **Infrastructure 层**：文件存储（`~/.ybc/`）、加密（AES-256-GCM）、HTTP 客户端、环境变量
 
-完整架构与设计决策见 `docs/design/architecture.md`；鉴权机制见 `docs/design/ref/auth-spec.md`。
+完整架构与鉴权设计见 `docs/design/architecture.md`。
 
 ---
 
@@ -139,7 +139,7 @@ npm publish
 - 配置变更通过 `configFingerprint` 立即作废旧 Token
 - 绝不在日志/错误中暴露 `appSecret` 或 `access_token`
 
-实现位于 `src/services/auth/token-manager.ts`。详细签名算法、数据中心查询、ADR 见 `docs/design/ref/auth-spec.md`。
+实现位于 `src/services/auth/token-manager.ts`。详细签名算法、数据中心查询、ADR 见 `docs/design/architecture.md`。
 
 ### 错误处理
 
@@ -235,7 +235,7 @@ tests/
 | 文档全景 | `docs/README.md` |
 | 用户使用 | `docs/guides/usage.md` |
 | 项目架构 | `docs/design/architecture.md` |
-| 鉴权机制 | `docs/design/ref/auth-spec.md` |
+| 鉴权机制 | `docs/design/architecture.md` |
 | 当前待办 | 根目录 `ROADMAP.md` |
 | 版本历史 | 根目录 `CHANGELOG.md` |
 | 用友官方 API 原文 | `docs/design/ref/` |

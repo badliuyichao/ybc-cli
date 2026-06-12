@@ -344,7 +344,7 @@ npm run build && node dist/bin/ybc.js --help   # ~150ms vs ts-node 的 ~1000ms
 | 想了解 | 看哪里 |
 |--------|--------|
 | 项目架构 | [`../design/architecture.md`](../design/architecture.md) |
-| 鉴权机制（签名 + Token + 数据中心）| [`../design/ref/auth-spec.md`](../design/ref/auth-spec.md) |
+| 鉴权机制（签名 + Token + 数据中心）| [`../design/architecture.md`](../design/architecture.md) |
 | 测试策略 | [`../design/testing.md`](../design/testing.md) |
 | 安全方案 | [`../design/security.md`](../design/security.md) |
 | 当前待办与下一步 | [`../../ROADMAP.md`](../../ROADMAP.md) |

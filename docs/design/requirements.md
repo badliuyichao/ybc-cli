@@ -178,6 +178,6 @@ ybc todo create --title <t>
 ## 7. 参考
 
 - 详细架构：[`architecture.md`](architecture.md)
-- 鉴权设计：[`ref/auth-spec.md`](ref/auth-spec.md)
+- 鉴权与架构：[`architecture.md`](architecture.md)
 - 测试策略：[`testing.md`](testing.md)
 - 用户使用指南：[`../guides/usage.md`](../guides/usage.md)

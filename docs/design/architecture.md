@@ -1,6 +1,6 @@
 # 架构设计
 
-> 本文档是 ybc 当前架构的权威说明。鉴权相关详见独立文档：[`ref/auth-spec.md`](ref/auth-spec.md)。
+> 本文档是 ybc 系统架构、鉴权机制与关键设计决策的**唯一权威说明**。
 
 ---
 
@@ -30,7 +30,7 @@
 
 ---
 
-## 2. 目录结构（与实际代码一一对应）
+## 2. 目录结构
 
 ```
 src/
@@ -61,7 +61,7 @@ src/
 
 ---
 
-## 3. OpenAPI 驱动的命令生成（核心范式）
+## 3. OpenAPI 驱动的命令生成
 
 ybc 的命令**不是手动编写**，而是从 OpenAPI 规范自动生成：
 
@@ -98,10 +98,7 @@ ybc staff query / ybc todo list / …
    ├─ DataCenterService.getDataCenterUrls(tenantId)
    │     ├─ 命中 ~/.ybc/datacenter.json  → 返回
    │     └─ 未命中 → GET api.yonyoucloud.com/.../getGatewayAddress
-   └─ TokenManager.getValidToken(config)
-         ├─ 命中内存 → 返回
-         ├─ 命中 ~/.ybc/token.json + 未过期 + 指纹匹配 → 返回
-         └─ 未命中 → SignatureService 计算签名 → GET tokenUrl/.../getAccessToken
+   └─ TokenManager.getValidToken(config)    # 详见 §5
    │
    ▼
 [API 层 / 业务命令] axios.get(gatewayUrl + path, {params: {access_token, ...}})
@@ -113,11 +110,129 @@ ybc staff query / ybc todo list / …
 [退出] 0 (成功) / 4 (业务错误) / 5 (网络) / 6 (鉴权)
 ```
 
-详细鉴权流程（含签名算法）见 [`ref/auth-spec.md`](ref/auth-spec.md)。
+---
+
+## 5. 鉴权机制
+
+用友 YonBIP 采用**多数据中心架构**，开发者调用接口前必须：先按 `tenantId` 查询数据中心域名 → 用 HmacSHA256 签名换取 `access_token` → 携带 token 调用业务接口。
+
+### 5.1 三类外部 API
+
+**数据中心域名查询**
+
+| 项 | 值 |
+|---|---|
+| URL | `https://api.yonyoucloud.com/open-auth/dataCenter/getGatewayAddress` |
+| 方法 | GET |
+| 参数 | `tenantId`（必需）|
+
+**响应**：
+```json
+{
+  "code": "00000",
+  "data": {
+    "gatewayUrl": "https://yonbip.diwork.com/iuap-api-gateway",
+    "tokenUrl":   "https://yonbip.diwork.com/iuap-api-auth"
+  }
+}
+```
+
+**Token 获取**
+
+| 项 | 值 |
+|---|---|
+| URL | `{tokenUrl}/open-auth/selfAppAuth/base/v1/getAccessToken` |
+| 方法 | **GET**（不是 POST）|
+| Header | `Content-Type: application/json`（GET 也必需）|
+| 参数 | `appKey`、`timestamp`（毫秒级）、`signature`|
+
+> 2023-07-21 升级：旧路径 `/selfAppAuth/getAccessToken` → 新路径 `/selfAppAuth/base/v1/getAccessToken`。ybc 已采用新路径。
+
+**业务接口调用**
+
+| 项 | 值 |
+|---|---|
+| Base URL | `{gatewayUrl}` |
+| 鉴权方式 | `access_token` 作为 **query 参数**（用友不接受 Authorization Header）|
+
+### 5.2 HmacSHA256 签名算法
+
+```
+signature = URLEncode( Base64( HmacSHA256( sortedParams, appSecret ) ) )
+```
+
+**五步计算**：
+
+1. 构建参数对象：`{ appKey, timestamp }`
+2. 按字母序排序：`["appKey", "timestamp"]`
+3. 拼接参数名和值（无分隔符）：`appKey<v>timestamp<v>`
+4. HmacSHA256 加密（密钥 = appSecret，UTF-8）
+5. Base64 编码
+
+**示例**：`appKey=41832a3d…`、`timestamp=1568098531823` 时，待签字符串为：
+```
+appKey41832a3d2df94989b500da6a22268747timestamp1568098531823
+```
+
+> ⚠️ **URLEncode 由 axios 负责**，不在签名服务中手动编码。双重编码会导致签名校验失败。详见 [ADR-5]。
+
+实现：`src/services/auth/signature-service.ts`。时间戳必须是毫秒级（`Date.now()`），机器时间与互联网偏差 ≤ 5 分钟。
+
+### 5.3 Token 三级缓存
+
+```
+用户命令
+  → TokenManager.getValidToken()
+      ├─ L1 内存缓存（进程内未过期 → 直接返回）
+      ├─ L2 ~/.ybc/token.json（文件存在 + 未过期 + configFingerprint 匹配 → 返回）
+      └─ L3 远程刷新（L1/L2 均失效时）
+           1. DataCenterService → 查询或命中缓存获取 tokenUrl
+           2. SignatureService → 生成时间戳 + 计算签名
+           3. GET {tokenUrl}/.../getAccessToken?appKey&timestamp&signature
+           4. 解析响应 → 写回 ~/.ybc/token.json（600 权限）
+```
+
+| 机制 | 细节 |
+|------|------|
+| **过期判定** | 提前 5 分钟视为过期（`expires_at <= now + 5min`）|
+| **configFingerprint** | `sha256(tenantId + appKey + appSecret + env)` — 配置变更立即作废旧 Token |
+| **401 重试** | 业务接口 401 → 清除缓存 → 刷新 Token → 重试一次 |
+| **数据中心缓存** | `~/.ybc/datacenter.json`，按 tenantId 命中；可手工 seed 用于离线测试 |
+| **向后兼容** | 新字段优先（`appKey/appSecret` → fallback `ak/sk`）；响应格式兼容两种 |
+
+### 5.4 类型契约
+
+```typescript
+interface TokenConfig {
+  tenantId: string;  appKey: string;  appSecret: string;
+  env: 'sandbox' | 'production';
+  tokenUrl?: string;     // 可选，跳过数据中心查询
+  gatewayUrl?: string;   // 可选
+}
+
+interface SignatureParams {
+  appKey: string;  timestamp: number;  // 毫秒级
+  appSecret: string;
+}
+
+interface DataCenterResponse {
+  code: string;  // '00000' = 成功
+  message: string;
+  data: { gatewayUrl: string; tokenUrl: string };
+}
+```
+
+### 5.5 测试覆盖
+
+| 测试 | 用例数 | 覆盖率 |
+|------|-------|--------|
+| `signature-service.test.ts` | 20 | 100% |
+| `datacenter-service.test.ts` | 19 | 97.5% |
+| `token-flow.test.ts`（集成）| 13 | 82% |
 
 ---
 
-## 5. 持久化文件
+## 6. 持久化文件
 
 | 文件 | 内容 | 权限 | 维护方 |
 |------|------|------|--------|
@@ -127,7 +242,7 @@ ybc staff query / ybc todo list / …
 
 ---
 
-## 6. 技术选型
+## 7. 技术选型
 
 | 组件 | 选型 | 理由 |
 |------|------|------|
@@ -135,57 +250,46 @@ ybc staff query / ybc todo list / …
 | CLI 框架 | commander.js 11 | 成熟、子命令、自动 help |
 | HTTP | axios | OpenAPI Generator 默认 |
 | 加密 | Node `crypto` | AES-256-GCM、HmacSHA256，无第三方依赖 |
-| 配置缓存 | 自研 `FileStorage` | 简单 JSON + 文件权限控制 |
+| 存储 | 自研 `FileStorage` | 简单 JSON + 文件权限控制 |
 | 表格输出 | cli-table3 | 颜色、对齐 |
-| 颜色 | chalk 4 | 与 cli-table3 配套 |
-| OpenAPI 生成 | @openapitools/openapi-generator-cli | 自动同步 API → 客户端 |
-| 测试 | Jest + ts-jest | TypeScript 友好；`axios-mock-adapter` 用于集成层；Express 写 Mock Server 用于 E2E |
+| 测试 | Jest + ts-jest | 集成层 `axios-mock-adapter`，E2E 用 Express Mock Server |
 | 代码风格 | ESLint + Prettier | 标配 |
 
 ---
 
-## 7. 关键架构决策（ADR 速查）
+## 8. 关键架构决策（ADR）
 
-| ADR | 决策 | 详细位置 |
-|-----|------|---------|
-| **ADR-1** | 用 TypeScript 而非 JavaScript | 类型安全 + IDE 重构 |
+| ADR | 决策 | 详见 |
+|-----|------|------|
+| **ADR-1** | TypeScript 而非 JavaScript | 类型安全 + IDE 重构 |
 | **ADR-2** | 文件缓存而非数据库 | 单用户 CLI，数据量小 |
-| **ADR-3** | OpenAPI 自动生成而非手写 300+ API | 见本文第 3 节 |
-| **ADR-4** | commander.js 而非 oclif | 项目规模中等，commander 足够 |
-| **ADR-5** | Token 三级缓存（内存 / 文件 / 远程）+ 提前 5 分钟刷新 | 见 [`ref/auth-spec.md`](ref/auth-spec.md) §4 |
-| **ADR-6** | URLEncode 由 axios 而非 SignatureService 负责 | 见 [`ref/auth-spec.md`](ref/auth-spec.md) ADR-1 |
-| **ADR-7** | 数据中心域名动态查询 + 缓存 | 见 [`ref/auth-spec.md`](ref/auth-spec.md) ADR-2 |
-| **ADR-8** | 业务接口用 `access_token` query 参数（非 Authorization Header）| 见 [`ref/auth-spec.md`](ref/auth-spec.md) ADR-3 |
+| **ADR-3** | OpenAPI 自动生成而非手写 300+ API | 见 §3 |
+| **ADR-4** | commander.js 而非 oclif | 项目规模中等 |
+| **ADR-5** | URLEncode 由 axios 而非 SignatureService 负责 | 避免双重编码导致签名失效 |
+| **ADR-6** | `~/.ybc/datacenter.json` 缓存 + 按 tenantId 命中，而非硬编码 URL | 支持多数据中心；可 seed 用于离线测试 |
+| **ADR-7** | `access_token` 用 query 参数而不用 Authorization Header | 用友 BIP 业务接口只认 query 参数 |
+| **ADR-8** | `configFingerprint = sha256(…)` 而非明文 | 配置变更即作废旧 Token，不可反推 appSecret |
 
 ---
 
-## 8. 非功能性要求
+## 9. 非功能性要求
 
 | 类别 | 目标 | 现状 |
 |------|------|------|
-| **CLI 启动** | < 500ms（编译版）| ✅ ~150ms（ts-node ~1000ms）|
-| **首次 API 调用** | < 2s（含数据中心查询 + Token 获取）| ✅ 接近目标 |
-| **后续 API 调用** | < 1s（缓存命中）| ✅ 达成 |
-| **测试覆盖率** | 单元 ≥80%、集成 ≥70% | ✅ 单元 ~90%、新模块 100% |
-| **跨平台** | Windows / macOS / Linux | ✅ Node.js ≥16 |
-| **安全** | `appSecret` 加密、文件 600、绝不日志暴露 | ✅ 已实施 |
+| CLI 启动 | < 500ms（编译版）| ✅ ~150ms |
+| 首次 API 调用 | < 2s（含数据中心查询 + Token）| ✅ 接近目标 |
+| 后续 API 调用 | < 1s（缓存命中）| ✅ |
+| 测试覆盖率 | 单元 ≥80%、集成 ≥70% | ✅ 单元 ~90% |
+| 跨平台 | Windows / macOS / Linux | ✅ Node.js ≥16 |
+| 安全 | appSecret 加密、文件 600、绝不日志暴露 | ✅ |
 
 ---
 
-## 9. 演进路线
+## 10. 演进路线
 
 | 阶段 | 状态 | 范围 |
 |------|------|------|
 | **Phase 1** | ✅ 完成 | 基础架构、Token 改造、staff + todo 两个域 |
-| **Phase 2** | 🟡 进行中 | 见 [`../../ROADMAP.md`](../../ROADMAP.md)：补 voucher 域、修剩余 E2E、真实 API 验证 |
+| **Phase 2** | 🟡 进行中 | 见 [`../../ROADMAP.md`](../../ROADMAP.md) |
 | **Phase 3** | 待启动 | 覆盖 90% API、批量调用、模板 |
 | **Phase 4** | 待启动 | 大模型友好（`--help-json`）、插件机制 |
-
----
-
-## 10. 参考
-
-- 鉴权完整设计与 API 规范：[`ref/auth-spec.md`](ref/auth-spec.md)
-- 测试策略：[`testing.md`](testing.md)
-- 安全方案：[`security.md`](security.md)
-- 需求与验收：[`requirements.md`](requirements.md)

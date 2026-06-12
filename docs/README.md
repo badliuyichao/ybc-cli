@@ -16,8 +16,7 @@ docs/
 │   ├── architecture.md      # 系统架构（4 层 + 命令流程 + ADR）
 │   ├── testing.md           # 测试策略
 │   ├── security.md          # 安全方案
-│   └── ref/                 # 用友 BIP 官方 API 规范 + 鉴权设计
-│       ├── auth-spec.md     # 鉴权规范（签名算法、Token 流程、ADR）
+│   └── ref/                 # 用友 BIP 官方 API 规范原文
 │       ├── 获取access_token.md
 │       ├── 获取租户所在数据中心域名.md
 │       └── 员工详情查询API.md
@@ -33,7 +32,7 @@ docs/
 |------|--------|
 | **安装并跑起来** | [`guides/usage.md`](guides/usage.md) |
 | **理解项目架构** | [`design/architecture.md`](design/architecture.md) |
-| **了解鉴权机制** | [`design/ref/auth-spec.md`](design/ref/auth-spec.md) |
+| **了解架构与鉴权** | [`design/architecture.md`](design/architecture.md) |
 | **看待办与下一步** | 项目根目录 [`ROADMAP.md`](../ROADMAP.md) |
 | **看版本历史** | 项目根目录 [`CHANGELOG.md`](../CHANGELOG.md) |
 | **看用友官方 API 原文** | [`design/ref/`](design/ref/) |
