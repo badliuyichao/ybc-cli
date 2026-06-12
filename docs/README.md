@@ -10,18 +10,18 @@
 docs/
 ├── README.md                # 本文档（唯一权威索引）
 ├── guides/                  # 面向用户：使用与故障排查
-│   ├── usage.md             # 安装、配置、命令、输出、调试（一份覆盖）
-│   └── troubleshooting.md   # 常见问题与故障排查（PR3 增补）
+│   └── usage.md             # 安装、配置、命令、输出、调试、故障排查（一份覆盖）
 ├── design/                  # 面向开发：设计与决策
-│   ├── requirements.md      # 需求与产品设计
-│   ├── architecture.md      # 系统架构 + 技术实现（PR3 合并）
+│   ├── requirements.md      # 需求与产品验收（含用户故事、功能优先级）
+│   ├── architecture.md      # 系统架构（4 层 + 命令流程 + ADR 速查）
 │   ├── auth-spec.md         # 鉴权规范（API+签名+Token 改造决策）
 │   ├── testing.md           # 测试策略
 │   ├── security.md          # 安全方案
 │   └── ref/                 # 用友官方 API 规范原文（不修改，备查）
 └── archive/                 # 历史归档（不再维护，仅备查）
     ├── phase1/              # Phase 1 计划/验收/最终报告
-    └── reports/             # 各类一次性任务报告
+    ├── reports/             # 各类一次性任务报告
+    └── legacy-designs/      # 旧版超长设计文档（已被精简版替代）
 ```
 
 ---
@@ -38,6 +38,7 @@ docs/
 | **看用友官方 API 原文** | [`design/ref/`](design/ref/) |
 | **排查具体问题** | [`guides/usage.md`](guides/usage.md) → 「故障排查」一节 |
 | **查看 Phase 1 的历史** | [`archive/phase1/`](archive/phase1/) |
+| **查看旧版超长设计文档** | [`archive/legacy-designs/`](archive/legacy-designs/) |
 
 ---
 

@@ -183,8 +183,9 @@ assert(decrypted === sk, '加密解密验证失败');
 ```json
 // ~/.ybc/config.json
 {
-  "ak": "test-access-key",
-  "sk_encrypted": "base64-encrypted-string...",
+  "tenantId": "test-tenant-id",
+  "appKey": "test-app-key",
+  "appSecret_encrypted": "base64-encrypted-string...",
   "env": "sandbox",
   "encryption_version": "v1"
 }
@@ -206,25 +207,37 @@ assert(decrypted === sk, '加密解密验证失败');
 #### 方案3: 环境变量注入（CI环境）
 
 **实现方式**:
-- 环境变量 `YBC_AK` / `YBC_SK`
+- 新环境变量（推荐）：`YBC_TENANT_ID` / `YBC_APP_KEY` / `YBC_APP_SECRET`
+- 旧环境变量（向后兼容）：`YBC_AK` / `YBC_SK`
 - 不写入任何文件
 
 **优先级**:
 环境变量优先级 > 配置文件
 
 ```typescript
-function getCredentials(): { ak: string; sk: string } {
-  // 优先级1: 环境变量
-  if (process.env.YBC_AK && process.env.YBC_SK) {
+function getCredentials(): { tenantId: string; appKey: string; appSecret: string } {
+  // 优先级1: 新环境变量
+  if (process.env.YBC_TENANT_ID && process.env.YBC_APP_KEY && process.env.YBC_APP_SECRET) {
     return {
-      ak: process.env.YBC_AK,
-      sk: process.env.YBC_SK,
+      tenantId: process.env.YBC_TENANT_ID,
+      appKey: process.env.YBC_APP_KEY,
+      appSecret: process.env.YBC_APP_SECRET,
     };
   }
 
-  // 优先级2: 配置文件（加密）
+  // 优先级2: 旧环境变量（向后兼容；缺 tenantId 仍需要从配置文件读取）
+  if (process.env.YBC_AK && process.env.YBC_SK) {
+    const config = loadConfig();
+    return {
+      tenantId: config.tenantId,
+      appKey: process.env.YBC_AK,
+      appSecret: process.env.YBC_SK,
+    };
+  }
+
+  // 优先级3: 配置文件（加密）
   const config = loadConfig();
-  const sk = decryptSK(config.sk_encrypted);
+  const appSecret = decryptAppSecret(config.appSecret_encrypted ?? config.sk_encrypted);
 
   return {
     ak: config.ak,
@@ -408,7 +421,7 @@ const httpsAgent = new https.Agent({
      └─ keytar.deletePassword()
 
   4. 清除环境变量（方案3）
-     └─ unset YBC_AK YBC_SK
+     └─ unset YBC_TENANT_ID YBC_APP_KEY YBC_APP_SECRET YBC_AK YBC_SK
 
   5. 清除日志缓存
      └─ rm ~/.ybc/logs/*

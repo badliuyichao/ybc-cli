@@ -112,8 +112,9 @@ Phase 7: 回归测试（每次发布）
 
 ```json
 {
-  "ak": "test-ak-12345",
-  "sk": "test-sk-abcde",
+  "tenantId": "test-tenant-id-12345",
+  "appKey": "test-app-key-12345678",
+  "appSecret": "test-app-secret-12345678901234",
   "env": "sandbox",
   "format": "table",
   "verbose": false,
@@ -285,8 +286,8 @@ export default mock;
 | **首次调用** | 无缓存Token时自动获取并调用成功 | P0 |
 | **Token过期** | Token过期时自动刷新并调用成功 | P0 |
 | **401重试** | 401错误时自动刷新Token并重试一次 | P0 |
-| **AK/SK错误** | AK/SK错误时抛出AuthError | P0 |
-| **环境变量注入** | YBC_AK/YBC_SK环境变量优先级 | P1 |
+| **凭证错误** | appKey/appSecret 错误时抛出 AuthError | P0 |
+| **环境变量注入** | YBC_TENANT_ID/YBC_APP_KEY/YBC_APP_SECRET 优先级（兼容旧 YBC_AK/YBC_SK） | P1 |
 | **配置文件加载** | 配置文件加载并初始化鉴权 | P0 |
 
 #### 4.2.2 命令执行流程集成测试
@@ -322,7 +323,7 @@ export default mock;
 | | 创建凭证 | ybc voucher create --data @payload.json → 成功创建 | P0 |
 | **运维工程师** | 批量查询 | ybc staff query --dept-id D001 --json → 返回JSON数据 | P0 |
 | | 非交互运行 | YBC_QUIET=1 ybc staff query → 无进度提示 | P1 |
-| | 环境变量配置 | YBC_AK/YBC_SK注入 → 自动鉴权 | P0 |
+| | 环境变量配置 | YBC_TENANT_ID/YBC_APP_KEY/YBC_APP_SECRET 注入 → 自动鉴权 | P0 |
 | **业务顾问** | 查询待办 | ybc todo list --status pending → 表格展示 | P0 |
 | | 标记完成 | ybc todo done <id> → 成功标记 | P0 |
 | | 搜索命令 | ybc search 待办 → 返回相关命令列表 | P1 |
@@ -363,8 +364,9 @@ describe('TokenManager', () => {
     storage = new FileStorage();
     logger = new Logger(false, true);
     tokenManager = new TokenManager(storage, logger, {
-      ak: 'test-ak',
-      sk: 'test-sk',
+      tenantId: 'test-tenant-id',
+      appKey: 'test-app-key',
+      appSecret: 'test-app-secret',
       env: 'sandbox'
     });
     mockAxios.reset();
@@ -482,8 +484,9 @@ describe('鉴权流程集成测试', () => {
 
     // Mock配置
     await configManager.save({
-      ak: 'test-ak',
-      sk: 'test-sk',
+      tenantId: 'test-tenant-id',
+      appKey: 'test-app-key',
+      appSecret: 'test-app-secret',
       env: 'sandbox'
     });
 
@@ -576,7 +579,7 @@ import fs from 'fs';
 describe('员工查询E2E测试', () => {
   beforeAll(() => {
     // 配置环境
-    execSync('ybc config init --ak test-ak --sk test-sk --env sandbox');
+    execSync('ybc config init --tenant-id test-tenant --app-key test-app-key --app-secret test-app-secret --env sandbox --non-interactive');
   });
 
   afterAll(() => {
@@ -760,7 +763,7 @@ fi
 | **输出格式** | JSON/Table/CSV/RAW输出格式正确 | 单元测试+E2E测试 |
 | **帮助系统** | 三级帮助、搜索、统计功能正常 | E2E测试 |
 | **错误处理** | 正确退出码、友好错误提示 | 单元测试+E2E测试 |
-| **环境变量** | YBC_AK/YBC_SK/YBC_FORMAT优先级正确 | 集成测试 |
+| **环境变量** | YBC_TENANT_ID/YBC_APP_KEY/YBC_APP_SECRET/YBC_FORMAT 优先级正确 | 集成测试 |
 
 ### 8.2 性能验收标准
 
