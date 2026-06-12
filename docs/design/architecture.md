@@ -1,7 +1,6 @@
 # 架构设计
 
-> 本文档是 ybc 当前架构的权威说明。原始的详细设计文档（含技术实现细节）已归档至 [`../archive/legacy-designs/`](../archive/legacy-designs/)。
-> 鉴权相关详见独立文档：[`auth-spec.md`](auth-spec.md)。
+> 本文档是 ybc 当前架构的权威说明。鉴权相关详见独立文档：[`ref/auth-spec.md`](ref/auth-spec.md)。
 
 ---
 
@@ -114,7 +113,7 @@ ybc staff query / ybc todo list / …
 [退出] 0 (成功) / 4 (业务错误) / 5 (网络) / 6 (鉴权)
 ```
 
-详细鉴权流程（含签名算法）见 [`auth-spec.md`](auth-spec.md)。
+详细鉴权流程（含签名算法）见 [`ref/auth-spec.md`](ref/auth-spec.md)。
 
 ---
 
@@ -153,10 +152,10 @@ ybc staff query / ybc todo list / …
 | **ADR-2** | 文件缓存而非数据库 | 单用户 CLI，数据量小 |
 | **ADR-3** | OpenAPI 自动生成而非手写 300+ API | 见本文第 3 节 |
 | **ADR-4** | commander.js 而非 oclif | 项目规模中等，commander 足够 |
-| **ADR-5** | Token 三级缓存（内存 / 文件 / 远程）+ 提前 5 分钟刷新 | 见 [`auth-spec.md`](auth-spec.md) §4 |
-| **ADR-6** | URLEncode 由 axios 而非 SignatureService 负责 | 见 [`auth-spec.md`](auth-spec.md) ADR-1 |
-| **ADR-7** | 数据中心域名动态查询 + 缓存 | 见 [`auth-spec.md`](auth-spec.md) ADR-2 |
-| **ADR-8** | 业务接口用 `access_token` query 参数（非 Authorization Header）| 见 [`auth-spec.md`](auth-spec.md) ADR-3 |
+| **ADR-5** | Token 三级缓存（内存 / 文件 / 远程）+ 提前 5 分钟刷新 | 见 [`ref/auth-spec.md`](ref/auth-spec.md) §4 |
+| **ADR-6** | URLEncode 由 axios 而非 SignatureService 负责 | 见 [`ref/auth-spec.md`](ref/auth-spec.md) ADR-1 |
+| **ADR-7** | 数据中心域名动态查询 + 缓存 | 见 [`ref/auth-spec.md`](ref/auth-spec.md) ADR-2 |
+| **ADR-8** | 业务接口用 `access_token` query 参数（非 Authorization Header）| 见 [`ref/auth-spec.md`](ref/auth-spec.md) ADR-3 |
 
 ---
 
@@ -186,8 +185,7 @@ ybc staff query / ybc todo list / …
 
 ## 10. 参考
 
-- 鉴权完整设计与 API 规范：[`auth-spec.md`](auth-spec.md)
+- 鉴权完整设计与 API 规范：[`ref/auth-spec.md`](ref/auth-spec.md)
 - 测试策略：[`testing.md`](testing.md)
 - 安全方案：[`security.md`](security.md)
 - 需求与验收：[`requirements.md`](requirements.md)
-- **历史详细设计**（含 Phase 1 之前的规划性内容）：[`../archive/legacy-designs/architecture-original.md`](../archive/legacy-designs/architecture-original.md) 和 [`technical-implementation-original.md`](../archive/legacy-designs/technical-implementation-original.md)

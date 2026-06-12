@@ -1,6 +1,6 @@
 # 需求与验收
 
-> 本文档汇总 ybc 的产品需求、用户角色、功能优先级、验收标准。原始的详细需求与验收文档已归档至 [`../archive/legacy-designs/`](../archive/legacy-designs/)。
+> 本文档是 ybc 产品需求、功能优先级与验收标准的权威说明。
 
 ---
 
@@ -178,7 +178,6 @@ ybc todo create --title <t>
 ## 7. 参考
 
 - 详细架构：[`architecture.md`](architecture.md)
-- 鉴权设计：[`auth-spec.md`](auth-spec.md)
+- 鉴权设计：[`ref/auth-spec.md`](ref/auth-spec.md)
 - 测试策略：[`testing.md`](testing.md)
 - 用户使用指南：[`../guides/usage.md`](../guides/usage.md)
-- **历史详细文档**：[`../archive/legacy-designs/requirements-original.md`](../archive/legacy-designs/requirements-original.md) 和 [`acceptance-criteria-original.md`](../archive/legacy-designs/acceptance-criteria-original.md)

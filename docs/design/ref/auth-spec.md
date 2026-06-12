@@ -357,7 +357,6 @@ interface DataCenterResponse {
 
 ## 9. 参考
 
-- 用友官方：[`ref/获取access_token.md`](ref/获取access_token.md)
-- 用友官方：[`ref/获取租户所在数据中心域名.md`](ref/获取租户所在数据中心域名.md)
-- 改造历史（详细前后对比）：[`../archive/reports/token-refactor.md`](../archive/reports/token-refactor.md)
+- 用友官方：[`获取access_token.md`](获取access_token.md)
+- 用友官方：[`获取租户所在数据中心域名.md`](获取租户所在数据中心域名.md)
 - 实现入口：`src/services/auth/`
