@@ -257,3 +257,19 @@ raw 通过独立 `--raw` flag 实现，但 `--format raw` 会被 commander 类�
 | **MISS-002** | 实现缺失 | 🟢 轻微 | 手写命令覆盖目录未建 |
 
 **统计**：一致性偏差 1 项 / 实现缺失 2 项 / 未文档化 1 项 / 文档过时 3 项
+
+---
+
+## 修复记录（2026-06-12）
+
+| 编码 | 修复内容 | 涉及文件 |
+|------|---------|---------|
+| **CONS-001** | 5 个命令统一使用 `ApiHttpWrapper`，access_token 作为 query 参数 | `src/services/api/api-http-wrapper.ts`（新建）、全部 5 个命令文件 |
+| **MISS-001** | `ApiHttpWrapper.call()` 内建 401 检测 → 清除缓存 → 刷新 Token → 重试 | `src/services/api/api-http-wrapper.ts`、`api-client-service.ts`（新增 `clearToken()`） |
+| **UNDOC-001** | architecture.md §2 加 update/ 目录、§6 加 update-check.json | `docs/design/architecture.md` |
+| **OUTD-001** | openapi.yaml 鉴权描述更新为 appKey/appSecret + HmacSHA256 + query 参数 | `openapi/openapi.yaml` |
+| **OUTD-002** | codes.ts 注释 "AK/SK" → "appKey/appSecret" | `src/services/error/codes.ts` |
+| **OUTD-003** | version 从 package.json 动态读取；--format 增加 raw；移除未实现的 --help-json | `src/cli/program.ts` |
+| **MISS-002** | architecture.md §3 更新约束：明确 generated 命令可手改，覆盖目录为未来改进 | `docs/design/architecture.md` |
+
+**全部 7 项已修复。**

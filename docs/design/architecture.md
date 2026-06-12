@@ -47,9 +47,10 @@ src/
 ├── services/
 │   ├── auth/                           # token-manager + signature + datacenter
 │   ├── config/                         # config-service
-│   ├── api/                            # api-client-service (统一工厂)
+│   ├── api/                            # api-client-service + api-http-wrapper (统一工厂)
 │   ├── error/                          # codes + errors + error-handler
-│   └── logger/                         # logger
+│   ├── logger/                         # logger
+│   └── update/                         # update-checker（启动时异步检查版本更新）
 ├── api/generated/                      # ⚠️ 自动生成（OpenAPI Generator）
 ├── infrastructure/
 │   ├── storage/                        # file-storage
@@ -80,7 +81,7 @@ ybc staff query / ybc todo list / …
 
 **关键约束**：
 - 修改 API 必须改 `openapi/openapi.yaml`，然后重新生成
-- 业务逻辑覆盖写到 `src/cli/commands/<domain>/`（非 `generated/`），不污染生成区
+- 生成的命令（`generated/`）在需要与架构决策对齐时（如 ADR-7 统一鉴权方式）可以直接修改；理想模式是通过 `src/cli/commands/<domain>/` 覆盖目录实现，但生成模板暂不支持该模式
 
 ---
 
@@ -239,6 +240,7 @@ interface DataCenterResponse {
 | `~/.ybc/config.json` | 配置（含加密 appSecret）| 600 | `ConfigService` |
 | `~/.ybc/token.json` | Token 缓存（含 `configFingerprint`）| 600 | `TokenManager` |
 | `~/.ybc/datacenter.json` | 数据中心域名缓存（按 tenantId）| 600 | `DataCenterService` |
+| `~/.ybc/update-check.json` | 版本更新检查缓存（24 小时内免查）| - | `UpdateChecker` |
 
 ---
 

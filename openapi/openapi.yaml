@@ -9,12 +9,13 @@ info:
     - 待办事项（todo）：待办列表查询、创建
 
     ## 认证方式
-    所有 API 调用需要在请求头中携带 Bearer Token：
+    通过 appKey/appSecret + HmacSHA256 签名获取 access_token，然后在请求 query 参数中携带：
     ```
-    Authorization: Bearer <your_access_token>
+    ?access_token=<access_token>&<业务参数>
     ```
 
-    Token 通过 AK/SK 签名机制获取，详见鉴权文档。
+    Token 获取流程：查询数据中心域名 → HmacSHA256 签名 → GET access_token。
+    详见 docs/design/architecture.md §5 鉴权机制。
 
     ## 错误处理
     API 返回统一的错误响应格式：

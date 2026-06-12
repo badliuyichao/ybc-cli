@@ -115,4 +115,11 @@ export class ApiClientService {
   clearCache(): void {
     this.cachedGatewayUrl = undefined;
   }
+
+  /**
+   * 清除缓存的 Token（用于 401 重试前刷新凭证）
+   */
+  async clearToken(): Promise<void> {
+    await this.tokenManager.clearCache();
+  }
 }

@@ -8,7 +8,7 @@
  * - 1: 通用错误（CLI 解析错误、参数错误等）
  * - 4: 业务错误（API 返回错误）
  * - 5: 网络错误（连接失败、超时等）
- * - 6: 鉴权错误（AK/SK 无效、token 刷新失败等）
+ * - 6: 鉴权错误（appKey/appSecret 无效、token 刷新失败等）
  */
 export enum ExitCode {
   /**
@@ -36,7 +36,7 @@ export enum ExitCode {
 
   /**
    * 鉴权错误
-   * 用于 AK/SK 无效、token 获取失败、token 刷新失败等鉴权相关问题
+   * 用于 appKey/appSecret 无效、token 获取失败、token 刷新失败等鉴权相关问题
    */
   AUTH_ERROR = 6,
 }
