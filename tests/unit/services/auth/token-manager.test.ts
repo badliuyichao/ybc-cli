@@ -226,6 +226,45 @@ describe('TokenManager', () => {
       );
       expect(dcCalls.length).toBe(0);
     });
+
+    // CR-002:缓存里空 token 不应被使用,必须重新刷新
+    it('should ignore empty access_token in cache and refresh (CR-002)', async () => {
+      // 1) 预置一个空 token 缓存(模拟老版本 bug 写入的脏数据)
+      const poisonedCache = {
+        access_token: '',
+        expires_in: 7200,
+        expires_at: Date.now() + 7200 * 1000, // 远未过期
+      };
+      await tokenManager.saveToCache(poisonedCache, validConfig);
+
+      // 2) mock 数据中心 + token API 返回新 token
+      mockAxios.onGet(/open-auth\/dataCenter\/getGatewayAddress/).reply(200, {
+        code: '00000',
+        message: '成功！',
+        data: {
+          gatewayUrl: 'https://yonbip-test.yonyoucloud.com/iuap-api-gateway',
+          tokenUrl: 'https://yonbip-test.yonyoucloud.com/iuap-api-auth',
+        },
+      });
+      mockAxios.onGet(/open-auth\/selfAppAuth\/base\/v1\/getAccessToken/).reply(200, {
+        code: '00000',
+        message: '成功！',
+        data: {
+          access_token: 'fresh-token-after-poisoned-cache',
+          expires_in: 3600,
+        },
+      });
+
+      // 3) getValidToken 应忽略空 token 缓存,重新请求 API
+      const token = await tokenManager.getValidToken(validConfig);
+      expect(token).toBe('fresh-token-after-poisoned-cache');
+
+      // 4) 验证 Token API 确实被调用
+      const tokenCalls = requestHistory.filter(
+        (req) => req.url && req.url.includes('getAccessToken')
+      );
+      expect(tokenCalls.length).toBe(1);
+    });
   });
 
   describe('refreshToken', () => {
@@ -394,6 +433,57 @@ describe('TokenManager', () => {
         data: {
           access_token: 'token-without-expiry',
         },
+      });
+
+      await expect(tokenManager.refreshToken(validConfig)).rejects.toThrow(AuthError);
+    });
+
+    // CR-002:响应缺 access_token 必须抛错,不能构造空 token 写入缓存
+    it('should throw AuthError when access_token is missing (CR-002)', async () => {
+      mockAxios.onGet(/open-auth\/dataCenter\/getGatewayAddress/).reply(200, {
+        code: '00000',
+        message: '成功！',
+        data: {
+          gatewayUrl: 'https://yonbip-test.yonyoucloud.com/iuap-api-gateway',
+          tokenUrl: 'https://yonbip-test.yonyoucloud.com/iuap-api-auth',
+        },
+      });
+
+      mockAxios.onGet(/open-auth\/selfAppAuth\/base\/v1\/getAccessToken/).reply(200, {
+        code: '00000',
+        message: '成功！',
+        data: {
+          // 故意不返回 access_token
+          expires_in: 7200,
+        },
+      });
+
+      await expect(tokenManager.refreshToken(validConfig)).rejects.toThrow(AuthError);
+
+      try {
+        await tokenManager.refreshToken(validConfig);
+      } catch (error) {
+        expect((error as AuthError).authDetails.reason).toBe(
+          AuthErrorReason.TOKEN_REFRESH_FAILED
+        );
+      }
+    });
+
+    // CR-002:简化的响应格式(无 code/data 包装)同样要校验 access_token 非空
+    it('should throw AuthError when access_token is empty string in simple format (CR-002)', async () => {
+      mockAxios.onGet(/open-auth\/dataCenter\/getGatewayAddress/).reply(200, {
+        code: '00000',
+        message: '成功！',
+        data: {
+          gatewayUrl: 'https://yonbip-test.yonyoucloud.com/iuap-api-gateway',
+          tokenUrl: 'https://yonbip-test.yonyoucloud.com/iuap-api-auth',
+        },
+      });
+
+      // 简化格式:access_token 是空字符串
+      mockAxios.onGet(/open-auth\/selfAppAuth\/base\/v1\/getAccessToken/).reply(200, {
+        access_token: '',
+        expires_in: 7200,
       });
 
       await expect(tokenManager.refreshToken(validConfig)).rejects.toThrow(AuthError);

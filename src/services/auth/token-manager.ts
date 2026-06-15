@@ -78,21 +78,28 @@ export class TokenManager {
     try {
       // 1. 检查内存缓存
       if (this.cachedToken) {
-        if (!this.isExpired(this.cachedToken)) {
+        // CR-002:内存里的 cachedToken 也必须 access_token 非空
+        if (this.cachedToken.access_token && !this.isExpired(this.cachedToken)) {
           return this.cachedToken.access_token;
         }
-        // 内存缓存已过期，清除
+        // 内存缓存已过期或内容无效，清除
         this.cachedToken = null;
       }
 
       // 2. 从文件加载缓存
       const fileToken = await this.loadFromCache(config);
       if (fileToken) {
-        if (!this.isExpired(fileToken)) {
+        // CR-002:缓存里的 access_token 必须非空;
+        // 历史原因(老版本 bug / 异常响应落盘)可能写入空 token
+        if (!fileToken.access_token) {
+          // 视为无效缓存,继续获取新 token
+          this.cachedToken = null;
+          await this.clearCache();
+        } else if (!this.isExpired(fileToken)) {
           this.cachedToken = fileToken;
           return fileToken.access_token;
         }
-        // 文件缓存已过期，继续获取新 token
+        // 文件缓存已过期或内容无效,继续获取新 token
       }
 
       // 3. 获取新 Token
@@ -193,6 +200,15 @@ export class TokenManager {
         throw new AuthError(
           AuthErrorReason.TOKEN_REFRESH_FAILED,
           'Token response missing expiration time'
+        );
+      }
+
+      // CR-002:即使 expiresIn 合法,也要校验 access_token 非空,
+      // 否则空 token 会被缓存,导致后续所有业务调用 401
+      if (!accessToken) {
+        throw new AuthError(
+          AuthErrorReason.TOKEN_REFRESH_FAILED,
+          'Token response missing access_token'
         );
       }
 
