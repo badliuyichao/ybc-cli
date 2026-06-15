@@ -201,6 +201,13 @@ function generateCommandFile(
   // 生成 API 调用参数
   const argsList = method.parameters.map(p => `options.${p.name}`).join(', ');
 
+  // CR-001:全局选项必须在每个子命令上显式声明,因为 commander 的子命令
+  // action 回调里 `options` 不继承父级 option(program.ts 注册的根 program
+  // --format 在子命令里看不到)
+  const globalOptionsCode = `    .option('--format <json|table|csv|raw>', '输出格式')
+    .option('--raw', '仅输出服务端原始 JSON')
+    .option('--verbose', '输出详细调试日志')`;
+
   return `/**
  * ${method.summary}
  *
@@ -220,6 +227,7 @@ export function ${functionName}(parent: Command) {
   parent
     .command('${commandName}')
     .description('${method.summary}')
+${globalOptionsCode}
 ${optionsCode || '    // 无参数'}
     .action(async (options) => {
       try {

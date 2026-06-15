@@ -14,6 +14,9 @@ export function registerStaffApiDisableStaffCommand(parent: Command) {
   parent
     .command('disable')
     .description('禁用员工')
+    .option('--format <json|table|csv|raw>', '输出格式')
+    .option('--raw', '仅输出服务端原始 JSON')
+    .option('--verbose', '输出详细调试日志')
     .requiredOption('--id <id>', '员工 ID')
     .action(async (options) => {
       try {

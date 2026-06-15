@@ -14,6 +14,9 @@ export function registerTodoApiCreateTodoCommand(parent: Command) {
   parent
     .command('create')
     .description('创建待办')
+    .option('--format <json|table|csv|raw>', '输出格式')
+    .option('--raw', '仅输出服务端原始 JSON')
+    .option('--verbose', '输出详细调试日志')
     .requiredOption('--title <title>', '待办标题')
     .option('--description [description]', '待办描述')
     .option('--priority [priority]', '优先级')

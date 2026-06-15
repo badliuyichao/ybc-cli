@@ -16,6 +16,9 @@ export function registerStaffApiQueryStaffCommand(parent: Command) {
   parent
     .command('query')
     .description('查询员工详情（简版员工专用）')
+    .option('--format <json|table|csv|raw>', '输出格式')
+    .option('--raw', '仅输出服务端原始 JSON')
+    .option('--verbose', '输出详细调试日志')
     .option('--id [id]', '员工 ID（id 和 code 至少传其一）')
     .option('--code [code]', '员工编码（id 和 code 至少传其一）')
     .action(async (options) => {
