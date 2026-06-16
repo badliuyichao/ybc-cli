@@ -196,17 +196,34 @@ appKey41832a3d2df94989b500da6a22268747timestamp1568098531823
 | 机制 | 细节 |
 |------|------|
 | **过期判定** | 提前 5 分钟视为过期（`expires_at <= now + 5min`）|
-| **configFingerprint** | `sha256(tenantId + appKey + appSecret + env)` — 配置变更立即作废旧 Token |
+| **configFingerprint** | `sha256(tenantId + appKey + appSecret)` — 配置变更立即作废旧 Token |
 | **401 重试** | 业务接口 401 → 清除缓存 → 刷新 Token → 重试一次 |
 | **数据中心缓存** | `~/.ybc/datacenter.json`，按 tenantId 命中；可手工 seed 用于离线测试 |
 | **向后兼容** | 新字段优先（`appKey/appSecret` → fallback `ak/sk`）；响应格式兼容两种 |
 
-### 5.4 类型契约
+### 5.4 关于 `env` 配置的重要说明
+
+> ⚠️ **设计决策**：`env` 字段（`sandbox` / `production`）在当前实现中**未实际参与 API 调用**。
+
+**原因**：
+- 用友 BIP 采用**多数据中心架构**，API 入口固定为 `https://api.yonyoucloud.com`
+- 实际的业务域名（`gatewayUrl`）和 Token 域名（`tokenUrl`）由 `DataCenterService` 根据 `tenantId` **动态查询**返回
+- 不同租户可能部署在不同数据中心，这不是由 `env` 配置决定的
+
+**当前 `env` 字段的作用**：
+- 仅用于 `configFingerprint` 计算（配置变更时作废旧 Token）
+- 作为预留字段，未来可能用于区分不同的 API 版本或测试环境
+
+**测试建议**：
+- E2E 测试应使用**真实凭证**连接用友公有云 API
+- 不需要区分 sandbox / production，因为 API 入口是固定的
+- 真正的环境隔离由用友平台的租户机制保证
+
+### 5.5 类型契约
 
 ```typescript
 interface TokenConfig {
   tenantId: string;  appKey: string;  appSecret: string;
-  env: 'sandbox' | 'production';
   tokenUrl?: string;     // 可选，跳过数据中心查询
   gatewayUrl?: string;   // 可选
 }

@@ -27,6 +27,7 @@
     "test:integration": "jest tests/integration",
     "test:e2e": "jest tests/e2e",
     "test:coverage": "jest --coverage",
+    "init:test-config": "ts-node scripts/init-test-config.ts",
     "generate:commands": "ts-node scripts/generate-commands.ts",
     "generate:api": "ts-node scripts/generate-api.ts",
     "validate:openapi": "npx @openapitools/openapi-generator-cli validate -i openapi/openapi.yaml",

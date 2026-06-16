@@ -42,3 +42,8 @@ yarn-error.log*
 .ybc/
 token.json
 config.json
+
+# Test credentials (NEVER commit)
+tests/config/test-credentials.json
+.env.test
+.env.test.local

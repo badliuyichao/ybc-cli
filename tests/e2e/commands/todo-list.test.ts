@@ -37,7 +37,7 @@ describe('Todo List Command E2E', () => {
     const listCommand = commands.find(cmd => cmd.name() === 'listTodos');
 
     expect(listCommand).toBeDefined();
-    expect(listCommand?.options).toHaveLength(5); // status, priority, assignee, page, pageSize
+    expect(listCommand?.options).toHaveLength(8); // format, raw, verbose, status, priority, assignee, page, pageSize
   });
 
   it('should parse status parameter correctly', async () => {

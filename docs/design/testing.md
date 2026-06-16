@@ -145,6 +145,153 @@ tests/
 
 ---
 
+## 4.1 Mock Server 详解（tests/mocks/mock-bip-server.ts）
+
+### 技术栈
+
+| 组件 | 版本 | 用途 |
+|------|------|------|
+| **Express** | ^5.2.1 | Web 框架，搭建 Mock API Server |
+| **TypeScript** | ^5.2.0 | 类型安全 |
+| **@types/express** | ^5.0.6 | Express 类型定义 |
+
+### 启动方式
+
+```typescript
+import { MockBipServer } from '../../mocks/mock-bip-server';
+
+// 创建并启动
+const mockServer = new MockBipServer({ port: 3000 });
+await mockServer.start();
+
+// 停止
+await mockServer.stop();
+
+// 获取 URL
+const url = mockServer.getUrl();  // http://localhost:3000
+```
+
+### 已实现接口列表
+
+| 端点 | 方法 | 功能 | 状态码 | 校验逻辑 |
+|------|------|------|--------|---------|
+| `/open-auth/selfAppAuth/base/v1/getAccessToken` | GET/POST | 获取 Token | 200/401 | 校验 ak/sk 长度 |
+| `/api/staff/query` | POST | 查询员工 | 200/401/403/404 | 校验 Authorization Header |
+| `/api/todo/list` | POST | 获取待办列表 | 200/401 | 校验 Authorization Header |
+| `/api/error/401` | GET | 模拟 401 错误 | 401 | 无 |
+| `/api/error/429` | GET | 模拟 429 限流 | 429 | 无 |
+| `/api/error/500` | GET | 模拟 500 错误 | 500 | 无 |
+
+### 接口报文格式
+
+#### Token 获取接口
+
+**请求**（GET）：
+```
+GET /open-auth/selfAppAuth/base/v1/getAccessToken?ak=xxx&sk=xxx
+```
+
+**响应**（成功）：
+```json
+{
+  "code": "00000",
+  "message": "成功",
+  "data": {
+    "access_token": "mock-token-1234567890-abc123",
+    "expires_in": 3600,
+    "token_type": "Bearer"
+  }
+}
+```
+
+**响应**（失败）：
+```json
+{
+  "code": "INVALID_CREDENTIALS",
+  "message": "Invalid AK/SK"
+}
+```
+
+**校验规则**：
+- `ak` 长度 ≥ 8
+- `sk` 长度 ≥ 14
+
+---
+
+#### 员工查询接口
+
+**请求**：
+```
+POST /api/staff/query
+Authorization: Bearer <token>
+Body: { "code": "EMP001" }
+```
+
+**响应**（成功）：
+```json
+{
+  "code": "SUCCESS",
+  "message": "查询成功",
+  "data": {
+    "staffs": [
+      {
+        "code": "EMP001",
+        "name": "张三",
+        "department": "研发部",
+        "status": "enabled"
+      }
+    ],
+    "total": 1
+  }
+}
+```
+
+**特殊参数触发错误**：
+| 参数 | 返回错误 | 状态码 |
+|------|---------|--------|
+| `code=INVALID_CODE` | NOT_FOUND | 404 |
+| `department=SECRET_DEPT` | PERMISSION_DENIED | 403 |
+| `page=-1` | INVALID_PARAMETER | 400 |
+
+---
+
+#### 待办列表接口
+
+**响应**（成功）：
+```json
+{
+  "code": "SUCCESS",
+  "message": "查询成功",
+  "data": {
+    "todos": [
+      {
+        "id": "TODO001",
+        "title": "完成Phase1验收",
+        "status": "pending",
+        "assignee": "张三",
+        "dueDate": "2026-04-30"
+      }
+    ],
+    "total": 1
+  }
+}
+```
+
+---
+
+### 已知问题（与 CLI 不匹配）
+
+| 问题 | Mock Server 实现 | CLI 实际调用 | 影响 |
+|------|-----------------|-------------|------|
+| **鉴权方式** | 校验 `ak/sk` 参数 | 使用 `appKey/timestamp/signature` 签名 | Token 获取失败 |
+| **业务接口鉴权** | 检查 `Authorization` Header | 使用 query 参数传递 token | 业务调用失败 |
+| **数据中心查询** | 未实现 `/getGatewayAddress` | 需要先查询数据中心域名 | 流程无法启动 |
+| **Token 响应格式** | 标准格式 | 支持多种格式（expires_in/expire） | 可能解析失败 |
+
+> 详见 `ROADMAP.md` 任务 4：Mock Server 问题修复
+
+---
+
 ## 5. 覆盖率目标
 
 | 层级 | 目标 | 当前 |
@@ -289,11 +436,120 @@ describe('Token Refresh E2E', () => {
 
 ---
 
-## 9. 已知缺口
+## 9. 真实 API 测试方案
+
+### 9.1 设计背景
+
+> 用友 BIP 采用多数据中心架构，API 入口固定为 `https://api.yonyoucloud.com`。
+> 实际的业务域名（`gatewayUrl`）和 Token 域名（`tokenUrl`）由 `DataCenterService` 根据 `tenantId` 动态查询返回。
+> 因此，所有环境都连接同一个固定地址，不需要区分 sandbox / production。
+
+### 9.2 密钥配置
+
+#### 方式 1：环境变量（推荐用于 CI/CD）
+
+```bash
+export YBC_TEST_TENANT_ID=your-tenant-id
+export YBC_TEST_APP_KEY=your-app-key
+export YBC_TEST_APP_SECRET=your-app-secret
+```
+
+#### 方式 2：测试配置文件（推荐用于本地开发）
+
+创建 `tests/config/test-credentials.json`（已在 .gitignore 中忽略）：
+
+```json
+{
+  "tenantId": "your-tenant-id",
+  "appKey": "your-app-key",
+  "appSecret": "your-app-secret"
+}
+```
+
+> ⚠️ **安全警告**：`test-credentials.json` 包含真实凭证，绝对不能提交到 Git。
+
+### 9.3 配置加载器
+
+```typescript
+// tests/config/test-config.ts
+import { loadTestConfig } from '../config/test-config';
+
+const config = loadTestConfig();
+// config.tenantId, config.appKey, config.appSecret
+```
+
+### 9.4 E2E 测试示例（真实 API）
+
+```typescript
+// tests/e2e/scenarios/real-api.test.ts
+import { loadTestConfig } from '../config/test-config';
+import * as fs from 'fs';
+import * as path from 'path';
+import * as os from 'os';
+import { execSync } from 'child_process';
+
+describe('Real API E2E Tests', () => {
+  let config: ReturnType<typeof loadTestConfig>;
+  let tempDir: string;
+
+  beforeAll(() => {
+    config = loadTestConfig();
+    tempDir = path.join(os.tmpdir(), `ybc-real-test-${Date.now()}`);
+    fs.mkdirSync(tempDir, { recursive: true });
+  });
+
+  afterAll(() => {
+    if (fs.existsSync(tempDir)) {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
+
+  it('should get token from real API', () => {
+    const testEnv = {
+      ...process.env,
+      HOME: tempDir,
+      USERPROFILE: tempDir,
+      YBC_TENANT_ID: config.tenantId,
+      YBC_APP_KEY: config.appKey,
+      YBC_APP_SECRET: config.appSecret,
+    };
+
+    // 执行查询（会自动查询数据中心、获取 Token）
+    const result = execSync(
+      'npx ts-node src/bin/ybc.ts staff query --code EMP001',
+      { env: testEnv, cwd: process.cwd(), encoding: 'utf-8' }
+    );
+
+    expect(result).toBeDefined();
+  });
+});
+```
+
+### 9.5 测试策略总结
+
+| 场景 | 测试类型 | Mock 方式 | 说明 |
+|------|---------|----------|------|
+| **CI/CD 自动化** | 单元测试 + 集成测试 | axios-mock-adapter | 安全、快速、稳定 |
+| **本地开发调试** | E2E（真实 API） | 无 Mock | 真实验证 |
+| **上线前验证** | E2E（真实 API） | 无 Mock | 最终确认 |
+| **命令注册验证** | E2E（命令模式） | jest.mock('axios') | 不需要真实 API |
+
+### 9.6 运行真实 API 测试
+
+```bash
+# 本地运行（需要先配置 test-credentials.json）
+npm run test:e2e
+
+# CI/CD 运行（通过环境变量注入）
+YBC_TEST_TENANT_ID=xxx YBC_TEST_APP_KEY=xxx YBC_TEST_APP_SECRET=xxx npm run test:e2e
+```
+
+---
+
+## 10. 已知缺口
 
 | 缺口 | 详情 | 追踪 |
 |------|------|------|
-| **E2E token-refresh 全部失败** | MockBipServer 与 CLI 的数据中心查询/签名/鉴权模式不匹配 | `ROADMAP.md` |
 | **ApiHttpWrapper 无测试** | `src/services/api/api-http-wrapper.ts`（新建）尚未覆盖 | 待补 |
 | **UpdateChecker 无测试** | `src/services/update/update-checker.ts` 无任何测试 | 待补 |
 | **api-client-service 无独立测试** | 仅在集成测试中间接覆盖 | 待补 |
@@ -302,9 +558,10 @@ describe('Token Refresh E2E', () => {
 
 ---
 
-## 10. 参考
+## 11. 参考
 
 - 架构与鉴权：`docs/design/architecture.md`
 - 需求与验收标准：`docs/design/requirements.md`
 - 审计报告（代码 vs 文档差异）：`docs/process/audit-code-vs-design.md`
 - 当前待办：根目录 `ROADMAP.md`
+- 测试配置：`tests/config/test-config.ts`

@@ -354,7 +354,7 @@ export class TokenManager {
    * @returns 指纹字符串
    */
   private getConfigFingerprint(config: TokenConfig): string {
-    const data = `${config.tenantId}:${config.appKey}:${config.appSecret}:${config.env}`;
+    const data = `${config.tenantId}:${config.appKey}:${config.appSecret}`;
     return crypto.createHash('sha256').update(data).digest('hex');
   }
 }

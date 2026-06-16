@@ -6,7 +6,7 @@
  * 2. 业务接口 401 自动清除缓存 → 刷新 Token → 重试一次（MISS-001）
  */
 
-import axios, { AxiosInstance, AxiosRequestConfig } from 'axios';
+import axios, { AxiosInstance } from 'axios';
 import { ApiClientService } from './api-client-service';
 import { Configuration } from '../../api/generated';
 import { AuthError, AuthErrorReason } from '../error/errors';

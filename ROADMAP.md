@@ -23,8 +23,8 @@
 | 待完成项 | 优先级 | 预估工作量 |
 |---------|--------|-----------|
 | **CLI命令适配** | 🔴 高 | 1-2小时 |
-| **E2E测试修复** | 🟡 中 | 30分钟-1小时 |
-| **真实API测试** | 🟢 低 | 需凭证 |
+| **E2E测试迁移到真实API** | 🟡 中 | 1-1.5小时 |
+| **单元测试覆盖率优化** | 🟡 中 | 1-1.5小时 |
 
 ---
 
@@ -222,26 +222,162 @@ await configService.init({
 
 ---
 
-### 任务 3：真实API测试（🟢 可选）
+### 任务 3：单元测试覆盖率优化（🟡 建议完成）
 
-**目标**：使用真实凭证验证完整流程
+**目标**：提升单元测试覆盖率，重点补充低覆盖率模块
 
-**前提条件**：
-- ✅ 拥有真实的 tenantId
-- ✅ 拥有真实的 appKey 和 appSecret
-- ✅ 任务 1 完成（CLI命令适配）
+**当前覆盖率**：91.79%（目标 ≥80%）✅ 已达标
 
-**测试步骤**：
-1. 使用 `ybc config init` 配置真实凭证
-2. 运行 `ybc staff query --verbose` 查看 Token 获取过程
-3. 验证签名计算、数据中心查询、Token获取是否正确
-4. 验证业务接口调用是否返回数据
+**需要补充测试的模块**：
 
-**验证清单**：
-- ✅ 签名计算正确（code='00000'）
-- ✅ 数据中心域名正确返回
-- ✅ Token成功获取（access_token）
-- ✅ 业务接口返回数据
+| 模块 | 当前覆盖率 | 目标 | 预估时间 |
+|------|-----------|------|---------|
+| `auth-interceptor.ts` | 53.48% | ≥80% | 30分钟 |
+| `file-storage.ts` | 82.81% | ≥90% | 20分钟 |
+| `error-handler.ts` | 87.01% | ≥95% | 15分钟 |
+| `config-service.ts` | 88.99% | ≥95% | 10分钟 |
+
+**总计**：约 1-1.5 小时
+
+---
+
+#### 子任务 3.1：补充 auth-interceptor 测试
+
+**文件**：`tests/unit/infrastructure/http/auth-interceptor.test.ts`
+
+**当前问题**：
+- 覆盖率 53.48%，未覆盖行：44, 77, 97-142
+- Token 过期检测逻辑未测试
+
+**补充内容**：
+```typescript
+// 测试 Token 过期检测
+it('should detect expired token', () => {
+  const expiredToken = {
+    access_token: 'test-token',
+    expires_at: Date.now() - 1000,  // 已过期
+  };
+  // 验证拦截器正确处理过期 token
+});
+
+// 测试自动刷新逻辑
+it('should trigger token refresh when expired', async () => {
+  // 验证拦截器调用 TokenManager 刷新
+});
+```
+
+---
+
+#### 子任务 3.2：补充 file-storage 测试
+
+**文件**：`tests/unit/infrastructure/file-storage.test.ts`
+
+**当前问题**：
+- 覆盖率 82.81%，未覆盖行：68, 108-134, 200, 264
+- 错误处理分支未完全覆盖
+
+**补充内容**：
+```typescript
+// 测试文件不存在时的处理
+it('should handle non-existent file gracefully', async () => {
+  const result = await storage.read('/nonexistent/file.json');
+  expect(result).toBeNull();
+});
+
+// 测试权限设置失败
+it('should handle permission errors', async () => {
+  // 验证权限设置失败时的降级处理
+});
+```
+
+---
+
+#### 子任务 3.3：补充 error-handler 测试
+
+**文件**：`tests/unit/services/error/error-handler.test.ts`
+
+**当前问题**：
+- 覆盖率 87.01%，未覆盖行：211-213, 218-222, 230-232
+- 部分错误类型处理未测试
+
+**补充内容**：
+```typescript
+// 测试 NetworkError 处理
+it('should handle NetworkError with correct exit code', () => {
+  const error = new NetworkError('Connection timeout');
+  const exitCode = errorHandler.handle(error);
+  expect(exitCode).toBe(5);
+});
+
+// 测试 ValidationError 处理
+it('should handle ValidationError with correct exit code', () => {
+  const error = new ValidationError('Invalid config');
+  const exitCode = errorHandler.handle(error);
+  expect(exitCode).toBe(1);
+});
+```
+
+---
+
+### 任务 4：E2E 测试迁移到真实 API（🟡 建议完成）
+
+**目标**：将 E2E 测试从 Mock Server 方案迁移到使用真实凭证连接用友公有云 API
+
+**背景**：
+- 用友 BIP API 入口固定为 `https://api.yonyoucloud.com`
+- 实际域名由 `DataCenterService` 根据 `tenantId` 动态查询返回
+- 不需要区分 sandbox / production
+
+**需要完成的工作**：
+
+| 工作项 | 说明 | 预估时间 |
+|--------|------|---------|
+| 创建测试配置加载器 | `tests/config/test-config.ts` | ✅ 已完成 |
+| 创建配置文件模板 | `tests/config/test-credentials.json.example` | ✅ 已完成 |
+| 更新 `.gitignore` | 忽略真实凭证文件 | ✅ 已完成 |
+| 编写真实 API E2E 测试 | 替换 Mock Server 测试 | 30 分钟 |
+| 更新测试文档 | `docs/design/testing.md` | ✅ 已完成 |
+
+**配置方式**：
+
+```bash
+# 方式 1：环境变量（CI/CD）
+export YBC_TEST_TENANT_ID=your-tenant-id
+export YBC_TEST_APP_KEY=your-app-key
+export YBC_TEST_APP_SECRET=your-app-secret
+
+# 方式 2：配置文件（本地开发）
+# 创建 tests/config/test-credentials.json
+```
+
+**测试示例**：
+
+```typescript
+import { loadTestConfig } from '../config/test-config';
+import { execSync } from 'child_process';
+
+describe('Real API E2E', () => {
+  const config = loadTestConfig();
+
+  it('should get token from real API', () => {
+    const result = execSync(
+      'npx ts-node src/bin/ybc.ts staff query --code EMP001',
+      {
+        env: {
+          ...process.env,
+          YBC_TENANT_ID: config.tenantId,
+          YBC_APP_KEY: config.appKey,
+          YBC_APP_SECRET: config.appSecret,
+        },
+        encoding: 'utf-8',
+      }
+    );
+    expect(result).toBeDefined();
+  });
+});
+```
+
+**总计**：约 30 分钟（配置加载器已完成）
 
 ---
 
@@ -254,7 +390,9 @@ await configService.init({
     ↓
 任务 2: E2E测试修复（1小时）
     ↓
-任务 3: 真实API测试（需凭证）
+任务 3: 单元测试覆盖率优化（1-1.5小时）
+    ↓
+任务 4: E2E测试迁移到真实API（30分钟）
 ```
 
 **优点**：
@@ -343,8 +481,9 @@ await configService.init({
 |------|--------|----------|---------|
 | **任务 1: CLI命令适配** | 1-1.5小时 | 20分钟 | 1-1.5小时 |
 | **任务 2: E2E测试修复** | 1小时 | 15分钟 | 1小时 |
-| **任务 3: 真实API测试** | 30分钟 | - | 30分钟 |
-| **总计** | **2.5-3小时** | **35分钟** | **2.5-3小时** |
+| **任务 3: 单元测试覆盖率优化** | 1-1.5小时 | 20分钟 | 1-1.5小时 |
+| **任务 4: E2E测试迁移到真实API** | 30分钟 | 15分钟 | 30分钟 |
+| **总计** | **3.5-4.5小时** | **70分钟** | **3.5-4.5小时** |
 
 ---
 
@@ -382,6 +521,26 @@ await configService.init({
 ---
 
 ### 任务 3 完成标准
+
+- ✅ auth-interceptor.ts 覆盖率 ≥80%
+- ✅ file-storage.ts 覆盖率 ≥90%
+- ✅ error-handler.ts 覆盖率 ≥95%
+- ✅ config-service.ts 覆盖率 ≥95%
+- ✅ 总体覆盖率保持 ≥90%
+
+---
+
+### 任务 4 完成标准
+
+- ✅ 测试配置加载器创建完成
+- ✅ 配置文件模板创建完成
+- ✅ `.gitignore` 已更新
+- ✅ E2E 测试迁移到真实 API
+- ✅ 测试文档已更新
+
+---
+
+### 任务 5 完成标准
 
 - ✅ 真实Token获取成功（code='00000'）
 - ✅ 签名计算正确
@@ -442,11 +601,19 @@ await configService.init({
 
 ### 任务 3 完成后
 
-**验证结果**：
-- ✅ 真实环境功能验证
-- ✅ Token获取流程正确
-- ✅ 业务接口调用成功
-- ✅ 符合官方API规范
+**项目状态**：
+- ✅ 单元测试覆盖率 ≥90%
+- ✅ 低覆盖率模块补充完成
+- ✅ 测试用例更加完善
+
+---
+
+### 任务 4 完成后
+
+**项目状态**：
+- ✅ E2E 测试使用真实 API
+- ✅ 测试配置管理规范化
+- ✅ 测试文档完整更新
 
 ---
 
@@ -461,7 +628,8 @@ await configService.init({
 | **方案 1** | Agent并行执行任务 1 | 20-30分钟 | ⭐⭐⭐⭐⭐ 推荐 |
 | **方案 2** | 手动执行任务 1 | 1-1.5小时 | ⭐⭐⭐ 可选 |
 | **方案 3** | Agent并行执行任务 1+2 | 35分钟 | ⭐⭐⭐⭐ 推荐 |
-| **方案 4** | 真实API测试（需凭证） | 30分钟 | ⭐⭐ 可选 |
+| **方案 4** | Agent并行执行任务 1+2+3 | 55分钟 | ⭐⭐⭐⭐ 推荐 |
+| **方案 5** | Agent并行执行任务 1+2+3+4 | 70分钟 | ⭐⭐⭐⭐ 推荐 |
 
 ---
 

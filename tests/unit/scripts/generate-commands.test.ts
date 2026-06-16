@@ -29,9 +29,7 @@ describe('Command Generator', () => {
       expect(existsSync(queryFile)).toBe(true);
 
       const content = readFileSync(queryFile, 'utf-8');
-      // 使用 axios 直接调用 API（access_token 作为 query 参数）
-      expect(content).toContain('axios');
-      expect(content).toContain('ApiClientService');
+      expect(content).toContain('ApiHttpWrapper');
       expect(content).toContain('员工详情');
       expect(content).toContain('.command(\'query\')');
     });
@@ -41,8 +39,8 @@ describe('Command Generator', () => {
       expect(existsSync(enableFile)).toBe(true);
 
       const content = readFileSync(enableFile, 'utf-8');
-      expect(content).toContain('StaffApi');
-      expect(content).toContain('enableStaff');
+      expect(content).toContain('ApiHttpWrapper');
+      expect(content).toContain('registerStaffApiEnableStaffCommand');
       expect(content).toContain('启用员工');
       expect(content).toContain('.command(\'enable\')');
     });
@@ -52,8 +50,8 @@ describe('Command Generator', () => {
       expect(existsSync(disableFile)).toBe(true);
 
       const content = readFileSync(disableFile, 'utf-8');
-      expect(content).toContain('StaffApi');
-      expect(content).toContain('disableStaff');
+      expect(content).toContain('ApiHttpWrapper');
+      expect(content).toContain('registerStaffApiDisableStaffCommand');
       expect(content).toContain('禁用员工');
       expect(content).toContain('.command(\'disable\')');
     });
@@ -82,8 +80,8 @@ describe('Command Generator', () => {
       expect(existsSync(createFile)).toBe(true);
 
       const content = readFileSync(createFile, 'utf-8');
-      expect(content).toContain('TodoApi');
-      expect(content).toContain('createTodo');
+      expect(content).toContain('ApiHttpWrapper');
+      expect(content).toContain('registerTodoApiCreateTodoCommand');
       expect(content).toContain('创建待办');
       expect(content).toContain('.command(\'create\')');
     });
@@ -119,9 +117,7 @@ describe('Command Generator', () => {
     it('should import API client correctly', () => {
       const queryFile = join(generatedDir, 'staff', 'queryStaff.ts');
       const content = readFileSync(queryFile, 'utf-8');
-      // 使用 ApiClientService 直接获取配置，然后使用 axios
-      expect(content).toContain('import { ApiClientService }');
-      expect(content).toContain('axios');
+      expect(content).toContain('import { ApiHttpWrapper }');
     });
 
     it('should import OutputManager correctly', () => {

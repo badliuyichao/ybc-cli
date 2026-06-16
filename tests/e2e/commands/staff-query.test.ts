@@ -29,7 +29,7 @@ describe('Staff Query Command E2E', () => {
     const queryCommand = commands.find(cmd => cmd.name() === 'query');
 
     expect(queryCommand).toBeDefined();
-    expect(queryCommand?.description()).toBe('查询人员信息');
+    expect(queryCommand?.description()).toBe('查询员工详情（简版员工专用）');
   });
 
   it('should have correct options for query command', () => {
@@ -37,7 +37,7 @@ describe('Staff Query Command E2E', () => {
     const queryCommand = commands.find(cmd => cmd.name() === 'query');
 
     expect(queryCommand).toBeDefined();
-    expect(queryCommand?.options).toHaveLength(6); // name, code, department, status, page, pageSize
+    expect(queryCommand?.options).toHaveLength(5); // format, raw, verbose, id, code
   });
 
   it('should parse code parameter correctly', async () => {
@@ -48,8 +48,7 @@ describe('Staff Query Command E2E', () => {
     // 验证命令有正确的选项
     const options = queryCommand?.options || [];
     expect(options.find(opt => opt.long === '--code')).toBeDefined();
-    expect(options.find(opt => opt.long === '--name')).toBeDefined();
-    expect(options.find(opt => opt.long === '--department')).toBeDefined();
+    expect(options.find(opt => opt.long === '--id')).toBeDefined();
   });
 
   it('should show help for staff query command', async () => {
@@ -67,8 +66,8 @@ describe('Staff Query Command E2E', () => {
     // 验证帮助信息包含关键内容
     expect(stdoutWriteSpy).toHaveBeenCalled();
     const helpOutput = stdoutWriteSpy.mock.calls.map(call => call[0]).join('');
-    expect(helpOutput).toContain('查询人员信息');
-    expect(helpOutput).toContain('--name');
+    expect(helpOutput).toContain('查询员工详情');
+    expect(helpOutput).toContain('--id');
     expect(helpOutput).toContain('--code');
 
     stdoutWriteSpy.mockRestore();

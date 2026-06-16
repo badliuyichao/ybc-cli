@@ -71,7 +71,8 @@ export YBC_SK=<your-secret-key>
 
 # 其他配置
 export YBC_FORMAT=json  # 可选：json, table, csv, raw
-export YBC_ENV=sandbox  # 可选：sandbox, production
+# 注意：YBC_ENV 配置在当前版本中未实际使用
+# API 入口固定为 https://api.yonyoucloud.com，实际域名由数据中心动态查询返回
 ```
 
 ### 配置文件
