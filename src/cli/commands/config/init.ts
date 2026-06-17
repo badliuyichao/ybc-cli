@@ -2,12 +2,16 @@
  * config init 命令
  *
  * 交互式初始化配置文件
+ *
+ * CR-041 重构（2026-06-17）：所有错误改用 throw + 顶层 handleErrorAndExit 统一处理
+ * （替代原 7 处直接 process.exit()）
  */
 
 import { Command } from 'commander';
 import * as readline from 'readline';
 import { ConfigService } from '../../../services/config/config-service';
 import { ValidationError } from '../../../services/error/errors';
+import { handleErrorAndExit } from '../../../services/error/error-handler';
 import { Environment, OutputFormat } from '../../../types/config';
 
 /**
@@ -35,7 +39,7 @@ export function registerConfigInitCommand(program: Command): void {
           console.log(`   ${configService.getConfigFilePath()}`);
           console.log();
           console.log('   或使用 "ybc config set" 命令修改配置项');
-          process.exit(1);
+          throw new ValidationError('配置文件已存在', { field: 'config' });
         }
 
         let config: {
@@ -49,8 +53,10 @@ export function registerConfigInitCommand(program: Command): void {
         if (options.nonInteractive) {
           // 非交互模式：从参数读取
           if (!options.tenantId || !options.appKey || !options.appSecret) {
-            console.error('❌ 非交互模式需要提供 --tenant-id, --app-key 和 --app-secret 参数');
-            process.exit(1);
+            throw new ValidationError(
+              '非交互模式需要提供 --tenant-id, --app-key 和 --app-secret 参数',
+              { field: 'options' }
+            );
           }
 
           config = {
@@ -85,7 +91,7 @@ export function registerConfigInitCommand(program: Command): void {
         console.log('  运行 "ybc config show" 查看完整配置');
         console.log('  运行 "ybc --help" 查看可用命令');
       } catch (error) {
-        handleError(error);
+        handleErrorAndExit(error instanceof Error ? error : new Error(String(error)));
       }
     });
 }
@@ -114,27 +120,35 @@ async function promptConfig(): Promise<{
   };
 
   const questionHidden = (prompt: string): Promise<string> => {
-    return new Promise((resolve) => {
+    return new Promise((resolve, reject) => {
+      if (!process.stdin.isTTY) {
+        reject(new Error('当前环境不支持隐藏输入（需要 TTY）。请使用 --non-interactive 模式。'));
+        return;
+      }
+
       process.stdout.write(prompt);
       process.stdin.setRawMode(true);
       process.stdin.resume();
       process.stdin.setEncoding('utf8');
 
       let password = '';
-      process.stdin.on('data', (char: string) => {
+      const onData = (char: string) => {
         switch (char) {
           case '\n':
           case '\r':
-          case '\u0004': // Ctrl+D
+          case '': // Ctrl+D
             process.stdin.setRawMode(false);
             process.stdin.pause();
+            process.stdin.removeListener('data', onData); // CR-007: 清理监听器
             process.stdout.write('\n');
             resolve(password);
             break;
-          case '\u0003': // Ctrl+C
-            process.exit();
+          case '': // Ctrl+C
+            process.stdin.removeListener('data', onData);
+            process.stdin.pause();
+            reject(new Error('用户取消输入'));
             break;
-          case '\u007F': // Backspace
+          case '': // Backspace
           case '\b':
             password = password.slice(0, -1);
             process.stdout.clearLine(0);
@@ -146,7 +160,9 @@ async function promptConfig(): Promise<{
             process.stdout.write('*');
             break;
         }
-      });
+      };
+
+      process.stdin.on('data', onData);
     });
   };
 
@@ -233,32 +249,12 @@ async function promptConfig(): Promise<{
     const confirm = await question('确认保存配置？ [Y/n]: ');
     if (confirm && confirm.toLowerCase() !== 'y' && confirm.toLowerCase() !== 'yes') {
       console.log('已取消配置');
-      process.exit(0);
+      // 取消不视为错误，返回空让上层退出
+      throw new ValidationError('用户取消配置', { field: 'confirm' });
     }
 
     return { tenantId, appKey, appSecret, env, format };
   } finally {
     rl.close();
   }
-}
-
-/**
- * 处理错误
- */
-function handleError(error: unknown): void {
-  if (error instanceof ValidationError) {
-    console.error(`❌ 验证失败: ${error.message}`);
-    if (error.validationDetails.field) {
-      console.error(`   字段: ${error.validationDetails.field}`);
-    }
-    process.exit(1);
-  }
-
-  if (error instanceof Error) {
-    console.error(`❌ 初始化失败: ${error.message}`);
-    process.exit(1);
-  }
-
-  console.error('❌ 发生未知错误');
-  process.exit(1);
 }

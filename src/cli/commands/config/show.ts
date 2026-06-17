@@ -2,10 +2,16 @@
  * config show 命令
  *
  * 显示当前配置
+ *
+ * CR-041 重构（2026-06-17）：所有错误改用 throw + 顶层 handleErrorAndExit 统一处理
+ * （替代原 3 处直接 process.exit()）
+ * 顺便修：option 描述 SK → appSecret
  */
 
 import { Command } from 'commander';
 import { ConfigService } from '../../../services/config/config-service';
+import { ValidationError } from '../../../services/error/errors';
+import { handleErrorAndExit } from '../../../services/error/error-handler';
 import chalk from 'chalk';
 
 /**
@@ -30,7 +36,7 @@ export function registerConfigShowCommand(program: Command): void {
     .command('show')
     .description('显示当前配置')
     .option('--json', '以 JSON 格式输出')
-    .option('--reveal', '显示完整的 SK（谨慎使用）')
+    .option('--reveal', '显示完整的 appSecret（谨慎使用）')
     .helpOption('-h, --help', '显示帮助信息')
     .action(async (options) => {
       try {
@@ -53,7 +59,7 @@ export function registerConfigShowCommand(program: Command): void {
           console.log(chalk.cyan('  export YBC_APP_KEY=<your-app-key>'));
           console.log(chalk.cyan('  export YBC_APP_SECRET=<your-app-secret>'));
           console.log();
-          process.exit(1);
+          throw new ValidationError('尚未配置', { field: 'config' });
         }
 
         // 读取配置
@@ -204,20 +210,7 @@ export function registerConfigShowCommand(program: Command): void {
           }
         }
       } catch (error) {
-        handleError(error);
+        handleErrorAndExit(error instanceof Error ? error : new Error(String(error)));
       }
     });
-}
-
-/**
- * 处理错误
- */
-function handleError(error: unknown): void {
-  if (error instanceof Error) {
-    console.error(`❌ 读取配置失败: ${error.message}`);
-    process.exit(1);
-  }
-
-  console.error('❌ 发生未知错误');
-  process.exit(1);
 }

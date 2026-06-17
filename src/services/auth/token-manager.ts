@@ -2,9 +2,9 @@
  * Token 管理器
  *
  * 负责 Token 的自动获取、刷新、缓存和过期检查
+ *
+ * CR-049（2026-06-17）：移除全文件 eslint-disable（实际已无 any 使用）
  */
-
-/* eslint-disable @typescript-eslint/no-explicit-any */
 
 import * as os from 'os';
 import * as path from 'path';
