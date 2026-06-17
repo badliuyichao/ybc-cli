@@ -311,7 +311,10 @@ export class ConfigService {
    */
   private validateTenantId(tenantId: string): void {
     if (!tenantId || tenantId.trim().length === 0) {
-      throw new ValidationError('Tenant ID cannot be empty', { field: 'tenantId', value: tenantId });
+      throw new ValidationError('Tenant ID cannot be empty', {
+        field: 'tenantId',
+        value: tenantId,
+      });
     }
   }
 
@@ -336,7 +339,10 @@ export class ConfigService {
    */
   private validateAppSecret(appSecret: string): void {
     if (!appSecret || appSecret.trim().length === 0) {
-      throw new ValidationError('App Secret cannot be empty', { field: 'appSecret', value: appSecret });
+      throw new ValidationError('App Secret cannot be empty', {
+        field: 'appSecret',
+        value: appSecret,
+      });
     }
 
     if (appSecret.length < 16 || appSecret.length > 256) {

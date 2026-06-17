@@ -45,10 +45,9 @@ export class UpdateChecker {
    * 获取 npm 上的最新版本号
    */
   private static async getLatestVersion(): Promise<string | null> {
-    const response = await axios.get(
-      `${this.NPM_REGISTRY}/${this.PACKAGE_NAME}/latest`,
-      { timeout: 3000 }
-    );
+    const response = await axios.get(`${this.NPM_REGISTRY}/${this.PACKAGE_NAME}/latest`, {
+      timeout: 3000,
+    });
     return response.data?.version || null;
   }
 
@@ -87,12 +86,8 @@ export class UpdateChecker {
    */
   private static showUpdateMessage(latestVersion: string): void {
     const currentVersion = this.getCurrentVersion();
-    console.log(
-      chalk.yellow(`\n💡 发现新版本: ${latestVersion} (当前: ${currentVersion})`)
-    );
-    console.log(
-      chalk.dim('   更新命令: npm install -g @liuychk/ybc@latest\n')
-    );
+    console.log(chalk.yellow(`\n💡 发现新版本: ${latestVersion} (当前: ${currentVersion})`));
+    console.log(chalk.dim('   更新命令: npm install -g @liuychk/ybc@latest\n'));
   }
 
   /**

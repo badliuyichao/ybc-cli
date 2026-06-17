@@ -38,7 +38,8 @@ export function registerConfigShowCommand(program: Command): void {
 
         // 检查配置是否存在
         const configExists = await configService.exists();
-        const hasEnvCredentials = process.env.YBC_TENANT_ID && process.env.YBC_APP_KEY && process.env.YBC_APP_SECRET;
+        const hasEnvCredentials =
+          process.env.YBC_TENANT_ID && process.env.YBC_APP_KEY && process.env.YBC_APP_SECRET;
 
         if (!configExists && !hasEnvCredentials) {
           console.log();

@@ -127,13 +127,13 @@ export function createAuthInterceptor(
 
         // 使用保存的客户端实例重试
         if (clientInstance) {
-          return clientInstance.request(config) as any;
+          return clientInstance.request(config);
         }
 
         // 如果没有客户端实例，尝试从 config 中获取
         const retryClient = (config as any)._client;
         if (retryClient) {
-          return retryClient.request(config) as any;
+          return retryClient.request(config);
         }
 
         // 最后的后备方案：使用 axios 默认实例

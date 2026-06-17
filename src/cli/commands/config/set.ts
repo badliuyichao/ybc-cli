@@ -102,7 +102,7 @@ export function registerConfigSetCommand(program: Command): void {
         }
 
         // 更新配置
-        await configService.setConfig(field as any, value);
+        await configService.setConfig(field, value);
 
         console.log(chalk.green('✅ 配置已更新'));
         console.log();

@@ -56,15 +56,18 @@ export class TokenManager {
     this.cacheFilePath = cacheFilePath || path.join(os.homedir(), '.ybc', 'token.json');
 
     // 创建或使用提供的 HTTP 客户端
-    this.httpClient = httpClient || axios.create({
-      timeout: 30000,
-      headers: {
-        'Content-Type': 'application/json',
-      },
-    });
+    this.httpClient =
+      httpClient ||
+      axios.create({
+        timeout: 30000,
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
 
     // 初始化数据中心服务（注入 axios 实例用于测试）
-    this.dataCenterService = dataCenterService || new DataCenterService(this.storage, this.httpClient);
+    this.dataCenterService =
+      dataCenterService || new DataCenterService(this.storage, this.httpClient);
     this.signatureService = new SignatureService();
   }
 
@@ -186,12 +189,19 @@ export class TokenManager {
       let expiresIn: number;
 
       if (hasFullFormat) {
-        const fullResponse = responseBody as { code: string; data?: { access_token: string; expires_in?: number; expire?: number } };
+        const fullResponse = responseBody as {
+          code: string;
+          data?: { access_token: string; expires_in?: number; expire?: number };
+        };
         accessToken = fullResponse.data?.access_token || '';
         expiresIn = fullResponse.data?.expires_in || fullResponse.data?.expire || 0;
       } else {
         // 简化格式
-        const simpleResponse = responseBody as { access_token: string; expires_in?: number; expire?: number };
+        const simpleResponse = responseBody as {
+          access_token: string;
+          expires_in?: number;
+          expire?: number;
+        };
         accessToken = simpleResponse.access_token || '';
         expiresIn = simpleResponse.expires_in || simpleResponse.expire || 0;
       }

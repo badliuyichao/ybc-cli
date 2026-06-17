@@ -38,7 +38,13 @@ export function registerConfigInitCommand(program: Command): void {
           process.exit(1);
         }
 
-        let config: { tenantId: string; appKey: string; appSecret: string; env: Environment; format: OutputFormat };
+        let config: {
+          tenantId: string;
+          appKey: string;
+          appSecret: string;
+          env: Environment;
+          format: OutputFormat;
+        };
 
         if (options.nonInteractive) {
           // 非交互模式：从参数读取

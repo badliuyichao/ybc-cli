@@ -136,7 +136,9 @@ export class EnvService {
    * @returns 是否配置了凭证
    */
   hasCredentials(): boolean {
-    return this.exists('YBC_TENANT_ID') && this.exists('YBC_APP_KEY') && this.exists('YBC_APP_SECRET');
+    return (
+      this.exists('YBC_TENANT_ID') && this.exists('YBC_APP_KEY') && this.exists('YBC_APP_SECRET')
+    );
   }
 
   /**

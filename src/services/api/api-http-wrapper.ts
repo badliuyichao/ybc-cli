@@ -148,9 +148,7 @@ export class ApiHttpWrapper {
     if (status && status >= 400 && status < 500) {
       const responseData = axiosError.response?.data as Record<string, unknown> | undefined;
       const businessCode =
-        (responseData?.code as string) ||
-        (responseData?.errorCode as string) ||
-        String(status);
+        (responseData?.code as string) || (responseData?.errorCode as string) || String(status);
       const businessMessage =
         (responseData?.message as string) ||
         (responseData?.error as string) ||
@@ -170,10 +168,7 @@ export class ApiHttpWrapper {
         statusCode: status,
         url,
       };
-      return new NetworkError(
-        `Server error ${status}: ${axiosError.message}`,
-        details
-      );
+      return new NetworkError(`Server error ${status}: ${axiosError.message}`, details);
     }
 
     // 超时
@@ -191,10 +186,7 @@ export class ApiHttpWrapper {
         isConnectionError: true,
         url,
       };
-      return new NetworkError(
-        `网络连接失败：${axiosError.message || 'unknown'}`,
-        details
-      );
+      return new NetworkError(`网络连接失败：${axiosError.message || 'unknown'}`, details);
     }
 
     // 兜底：透传原始 AxiosError（避免丢失堆栈）

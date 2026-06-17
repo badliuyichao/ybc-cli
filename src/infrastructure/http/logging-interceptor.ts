@@ -90,7 +90,7 @@ export function createLoggingInterceptor(logger: Logger): HttpInterceptor {
       const method = (config.method ?? 'GET').toUpperCase();
       const url = config.baseURL
         ? `${config.baseURL}${config.url ?? ''}`
-        : config.url ?? 'unknown';
+        : (config.url ?? 'unknown');
 
       logger.debug(`HTTP Request: ${method} ${url}`);
 
@@ -129,7 +129,7 @@ export function createLoggingInterceptor(logger: Logger): HttpInterceptor {
       const method = (config.method ?? 'GET').toUpperCase();
       const url = config.baseURL
         ? `${config.baseURL}${config.url ?? ''}`
-        : config.url ?? 'unknown';
+        : (config.url ?? 'unknown');
       const status = response.status;
 
       logger.debug(`HTTP Response: ${method} ${url} - ${status}`);
@@ -159,7 +159,7 @@ export function createLoggingInterceptor(logger: Logger): HttpInterceptor {
       const method = (config?.method ?? 'GET').toUpperCase();
       const url = config?.baseURL
         ? `${config.baseURL}${config.url ?? ''}`
-        : config?.url ?? 'unknown';
+        : (config?.url ?? 'unknown');
 
       if (error.response) {
         // 服务器返回错误响应
