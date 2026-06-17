@@ -666,6 +666,17 @@ describe('Real API E2E', () => {
   - 移除每个生成命令的 `process.exit(1)`
 - **工作量**：约 30 分钟（含 1 次端到端重生成验证）
 - **价值**：⭐⭐⭐⭐⭐（防回归，让 Phase 3 加新域变得安全）
+- **完成时间**：2026-06-17（commit `43e6eeb`）
+- **完成内容**：
+  - 解析层从 AxiosParamCreator 提取 method/path/pathParams/bodyParam
+  - 模板统一为 ApiHttpWrapper 模式 + handleErrorAndExit + 业务成功码判断（CR-016 统一）
+  - 5 个命令重生成（queryStaff/enableStaff/disableStaff/listTodos/createTodo）全部正确：
+    - queryStaff: GET query param
+    - enableStaff/disableStaff: POST path param
+    - listTodos: GET 多 query param
+    - createTodo: POST body param
+  - 下次 `npm run generate:commands` 直接产出正确代码，无需手改
+  - TypeScript 编译 0 错误，全套测试 34/36 套件通过（2 失败 = performance 网络超时，与代码无关）
 
 #### 待办-002：真正删除 auth-interceptor
 - **跟踪**：CR-042
