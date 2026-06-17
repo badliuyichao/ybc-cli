@@ -704,6 +704,23 @@ describe('Real API E2E', () => {
   - 手写代码剩余错误逐个修复
 - **工作量**：约 30 分钟
 - **价值**：⭐⭐⭐（让 `npm run lint` 干净）
+- **完成时间**：2026-06-17（commit `79bdb5b`）
+- **完成内容**：
+  - `.eslintrc.js` ignorePatterns 加 `src/api/generated/**` 和 `src/cli/commands/generated/**`（按 CLAUDE.md 规则：生成代码不可手改，不做 lint）
+  - 9 个手写文件修复 ~30 个 typescript-eslint 错误：
+    - update-checker: JSON.parse 类型断言 + async 改 sync
+    - init.ts: options 类型注解 + onData 返回类型
+    - set.ts: type predicate 收窄 + String() 包装
+    - show.ts: options 类型注解
+    - index.ts: async 改 Promise wrapper
+    - output/index.ts: String() 包装
+    - program.ts: JSON.parse 类型断言
+    - logging-interceptor.ts: 数组分支 unknown 标注
+    - api-http-wrapper.ts: 箭头函数返回类型
+    - config-service.ts: String() 包装
+  - `npm run lint` 结果：96 errors + 4 warnings → **0 errors + 0 warnings** ✅
+  - TypeScript 编译 0 错误
+  - 单元测试 22/22 套件，436 用例全过
 
 ---
 
