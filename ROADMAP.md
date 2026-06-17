@@ -688,6 +688,13 @@ describe('Real API E2E', () => {
   - 更新 `tests/unit/infrastructure/http/auth-interceptor.test.ts`（删除或保留为基类测试）
 - **工作量**：约 15 分钟
 - **价值**：⭐⭐⭐⭐（清掉 10 处 `any` 风险 + 减少包体积）
+- **完成时间**：2026-06-17（commit `df1bd85`）
+- **完成内容**：
+  - 删除 `src/infrastructure/http/auth-interceptor.ts`（154 行 + 10 处 any）
+  - 删除 `tests/unit/infrastructure/http/auth-interceptor.test.ts`（7 用例）
+  - 从 `index.ts` 移除 `createAuthInterceptor` 导出，加注释指向 `ApiHttpWrapper`
+  - 业务无任何引用（已 grep 确认），是真正的安全删除
+  - TypeScript 编译 0 错误，22/22 单元测试套件通过（436 用例）
 
 #### 待办-003：清理剩余 ESLint 真实错误
 - **跟踪**：CR-015 剩余（生成代码部分）
