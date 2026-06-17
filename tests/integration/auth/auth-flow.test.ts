@@ -3,13 +3,11 @@
  *
  * 测试完整的配置 → 获取 Token → 缓存 → 过期 → 刷新流程
  *
- * ⚠️ 临时跳过（2026-06-16）
- * 失败根因：本测试基于旧版 TokenManager 假设（POST 请求 + 直接返回 access_token 字段），
- * 与新版（CR-001/CR-002 修复后）的 GET 请求 + 嵌套响应格式 `{code, data:{access_token, expire}}` 不兼容。
- * 重写工作量约 4-6 小时，需先重写 `TokenManager` mock helper，再调整全部 8 个用例。
- *
- * 跟踪：CR-037 / docs/process/code-review-20260616.md
- * 重写后恢复方法：去掉 `.skip` 后缀，参考 `tests/integration/auth/token-flow.test.ts` 的 mock 模式。
+ * 重写记录（2026-06-17, CR-037）：
+ * - 适配新版 TokenManager（GET + HmacSHA256 + 嵌套响应格式）
+ * - 加 GET /getGatewayAddress mock（数据中心查询前置步骤）
+ * - mock 响应格式改为 {code: '00000', data: {access_token, expire}}
+ * - 移除 Bearer Header 断言（ADR-7：query 参数传 token）
  */
 
 import * as path from 'path';
@@ -20,8 +18,45 @@ import { ConfigService } from '@/services/config/config-service';
 import { TokenManager } from '@/services/auth/token-manager';
 import { FileStorage } from '@/infrastructure/storage/file-storage';
 import { AuthError, AuthErrorReason } from '@/services/error/errors';
+import { TokenConfig } from '@/types/auth';
 
-describe('Auth Flow Integration', () => {
+/**
+ * 标准 mock：数据中心查询 + Token 获取
+ */
+function setupStandardMocks(
+  mockAxios: MockAdapter,
+  options: {
+    tokenResponse?: unknown;
+    tokenStatus?: number;
+    dataCenterResponse?: unknown;
+  } = {}
+): void {
+  // 数据中心查询 mock
+  mockAxios
+    .onGet(/getGatewayAddress/)
+    .reply(200, options.dataCenterResponse ?? {
+      code: '00000',
+      message: '成功',
+      data: {
+        gatewayUrl: 'https://test-gateway.example.com/iuap-api-gateway',
+        tokenUrl: 'https://test-token.example.com/iuap-api-auth',
+      },
+    });
+
+  // Token 获取 mock
+  mockAxios
+    .onGet(/getAccessToken/)
+    .reply(
+      options.tokenStatus ?? 200,
+      options.tokenResponse ?? {
+        code: '00000',
+        message: '成功',
+        data: { access_token: 'mock-token-12345', expire: 3600 },
+      }
+    );
+}
+
+describe('Auth Flow Integration (重写于 2026-06-17)', () => {
   let configService: ConfigService;
   let tokenManager: TokenManager;
   let storage: FileStorage;
@@ -29,31 +64,28 @@ describe('Auth Flow Integration', () => {
   let tempDir: string;
 
   beforeEach(() => {
-    // 创建临时目录
     tempDir = path.join(os.tmpdir(), 'ybc-auth-flow-', Date.now().toString());
     storage = new FileStorage();
-
-    // 创建 axios mock
     mockAxios = new MockAdapter(axios);
 
-    // 创建服务
     configService = new ConfigService(tempDir);
     const tokenCachePath = path.join(tempDir, 'token.json');
     tokenManager = new TokenManager(storage, tokenCachePath);
+
+    // 把 tokenManager 内部的 datacenterService 也指向同一个临时目录
+    // 避免不同测试之间的数据中心缓存污染
+    (tokenManager as any).dataCenterService.cacheFilePath = path.join(tempDir, 'datacenter.json');
   });
 
   afterEach(async () => {
-    // 清理 mock
     mockAxios.restore();
 
-    // 清理临时文件
     try {
       await storage.delete(tempDir);
     } catch {
       // 忽略清理错误
     }
 
-    // 清理环境变量
     delete process.env.YBC_TENANT_ID;
     delete process.env.YBC_APP_KEY;
     delete process.env.YBC_APP_SECRET;
@@ -61,7 +93,7 @@ describe('Auth Flow Integration', () => {
   });
 
   describe('complete auth flow', () => {
-    it('should complete full auth flow: config → get token → cache → refresh', async () => {
+    it('应该完成完整鉴权流程：配置 → 获取 token → 缓存 → 刷新', async () => {
       // 1. 初始化配置
       const configData = {
         tenantId: 'test-tenant-12345678',
@@ -69,24 +101,21 @@ describe('Auth Flow Integration', () => {
         appSecret: 'test-app-secret-12345678901234',
         env: 'sandbox' as 'sandbox' | 'production',
       };
-
       await configService.init(configData);
+      expect(await configService.exists()).toBe(true);
 
-      // 验证配置文件创建
-      const configExists = await configService.exists();
-      expect(configExists).toBe(true);
-
-      // 2. 设置 mock API
-      mockAxios.onPost(/open-auth\/authorize\/token/).reply(200, {
-        access_token: 'initial-token-12345',
-        expires_in: 3600, // 1 小时
-        token_type: 'Bearer',
+      // 2. 设置标准 mock（首次 token）
+      setupStandardMocks(mockAxios, {
+        tokenResponse: {
+          code: '00000',
+          message: '成功',
+          data: { access_token: 'initial-token-12345', expire: 3600 },
+        },
       });
 
       // 3. 加载配置并获取 Token
       const config = await configService.getConfig({ decryptSensitive: true });
-
-      const tokenConfig = {
+      const tokenConfig: TokenConfig = {
         tenantId: config.tenantId!,
         appKey: config.appKey!,
         appSecret: config.appSecret!,
@@ -96,38 +125,43 @@ describe('Auth Flow Integration', () => {
       const token1 = await tokenManager.getValidToken(tokenConfig);
       expect(token1).toBe('initial-token-12345');
 
-      // 4. 验证 Token 缓存
+      // 4. 验证缓存
       const cachedToken = await tokenManager.loadFromCache(tokenConfig);
       expect(cachedToken).not.toBeNull();
       expect(cachedToken?.access_token).toBe('initial-token-12345');
 
-      // 5. 第二次获取应该使用缓存（不调用 API）
+      // 5. 第二次获取应使用缓存（不调 API）
       const token2 = await tokenManager.getValidToken(tokenConfig);
       expect(token2).toBe('initial-token-12345');
-      expect(mockAxios.history.post.length).toBe(1); // 只调用一次
+
+      // 数据中心 + token 获取只调用 1 次
+      expect(mockAxios.history.get.filter(r => /getAccessToken/.test(r.url || '')).length).toBe(1);
 
       // 6. Token 过期后刷新
-      mockAxios.onPost(/open-auth\/authorize\/token/).reply(200, {
-        access_token: 'refreshed-token-67890',
-        expires_in: 7200, // 2 小时
+      mockAxios.reset();
+      setupStandardMocks(mockAxios, {
+        tokenResponse: {
+          code: '00000',
+          message: '成功',
+          data: { access_token: 'refreshed-token-67890', expire: 7200 },
+        },
       });
 
-      // 手动设置过期
-      const expiredToken = {
-        access_token: 'expired-token',
-        expires_in: 3600,
-        expires_at: Date.now() - 1000,
-      };
-      await tokenManager.saveToCache(expiredToken, tokenConfig);
+      // 手动写入过期 token 到缓存
+      await tokenManager.saveToCache(
+        {
+          access_token: 'expired-token',
+          expires_in: 3600,
+          expires_at: Date.now() - 1000,
+        },
+        tokenConfig
+      );
 
-      // 获取新 Token
       const token3 = await tokenManager.getValidToken(tokenConfig);
       expect(token3).toBe('refreshed-token-67890');
-      expect(mockAxios.history.post.length).toBe(2); // 调用两次
     });
 
-    it('should handle auth failure gracefully', async () => {
-      // 1. 初始化配置
+    it('应该优雅处理鉴权失败', async () => {
       await configService.init({
         tenantId: 'test-tenant-12345678',
         appKey: 'test-app-key-12345678',
@@ -135,15 +169,14 @@ describe('Auth Flow Integration', () => {
         env: 'sandbox' as 'sandbox' | 'production',
       });
 
-      // 2. 设置 mock API 返回错误
-      mockAxios.onPost(/open-auth\/authorize\/token/).reply(401, {
-        code: 'INVALID_CREDENTIALS',
-        message: 'Invalid AK/SK',
+      // Mock 数据中心查询成功，但 Token 获取失败
+      setupStandardMocks(mockAxios, {
+        tokenStatus: 401,
+        tokenResponse: { code: 'INVALID_CREDENTIALS', message: 'Invalid appKey/appSecret' },
       });
 
-      // 3. 获取 Token 应该失败
       const config = await configService.getConfig({ decryptSensitive: true });
-      const tokenConfig = {
+      const tokenConfig: TokenConfig = {
         tenantId: config.tenantId!,
         appKey: config.appKey!,
         appSecret: config.appSecret!,
@@ -160,41 +193,39 @@ describe('Auth Flow Integration', () => {
       }
     });
 
-    it('should work with environment variables', async () => {
+    it('应该支持环境变量配置（无需配置文件）', async () => {
       // 1. 设置环境变量
       process.env.YBC_TENANT_ID = 'env-test-tenant';
       process.env.YBC_APP_KEY = 'env-test-app-key-12345678';
       process.env.YBC_APP_SECRET = 'env-test-app-secret-12345678901234';
       process.env.YBC_ENV = 'production';
 
-      // 2. 不创建配置文件，直接从环境变量读取
+      // 2. 不创建配置文件，从环境变量读取
       const config = await configService.getConfig({ decryptSensitive: true });
-
       expect(config.tenantId).toBe('env-test-tenant');
       expect(config.appKey).toBe('env-test-app-key-12345678');
       expect(config.appSecret).toBe('env-test-app-secret-12345678901234');
       expect(config.env).toBe('production');
 
-      // 3. 设置 mock API
-      mockAxios.onPost(/open-auth\/authorize\/token/).reply(200, {
-        access_token: 'env-token',
-        expires_in: 3600,
+      // 3. mock 并获取 Token
+      setupStandardMocks(mockAxios, {
+        tokenResponse: {
+          code: '00000',
+          message: '成功',
+          data: { access_token: 'env-token', expire: 3600 },
+        },
       });
 
-      // 4. 使用环境变量配置获取 Token
-      const tokenConfig = {
+      const token = await tokenManager.getValidToken({
         tenantId: config.tenantId!,
         appKey: config.appKey!,
         appSecret: config.appSecret!,
         env: config.env!,
-      };
-
-      const token = await tokenManager.getValidToken(tokenConfig);
+      });
       expect(token).toBe('env-token');
     });
 
-    it('should clear cache and re-authenticate', async () => {
-      // 1. 初始化配置
+    it('应该清除缓存后重新认证', async () => {
       await configService.init({
         tenantId: 'test-tenant-12345678',
         appKey: 'test-app-key-12345678',
@@ -202,42 +233,45 @@ describe('Auth Flow Integration', () => {
         env: 'sandbox' as 'sandbox' | 'production',
       });
 
-      // 2. 设置 mock API
-      mockAxios.onPost(/open-auth\/authorize\/token/).reply(200, {
-        access_token: 'first-token',
-        expires_in: 3600,
+      setupStandardMocks(mockAxios, {
+        tokenResponse: {
+          code: '00000',
+          message: '成功',
+          data: { access_token: 'first-token', expire: 3600 },
+        },
       });
 
       const config = await configService.getConfig({ decryptSensitive: true });
-      const tokenConfig = {
+      const tokenConfig: TokenConfig = {
         tenantId: config.tenantId!,
         appKey: config.appKey!,
         appSecret: config.appSecret!,
         env: config.env!,
       };
 
-      // 3. 获取 Token
       const token1 = await tokenManager.getValidToken(tokenConfig);
       expect(token1).toBe('first-token');
 
-      // 4. 清除缓存
+      // 清除缓存
       await tokenManager.clearCache();
 
-      // 5. 设置新的 mock 响应
-      mockAxios.onPost(/open-auth\/authorize\/token/).reply(200, {
-        access_token: 'second-token',
-        expires_in: 3600,
+      // 重置 mock 给新响应
+      mockAxios.reset();
+      setupStandardMocks(mockAxios, {
+        tokenResponse: {
+          code: '00000',
+          message: '成功',
+          data: { access_token: 'second-token', expire: 3600 },
+        },
       });
 
-      // 6. 再次获取应该重新认证
       const token2 = await tokenManager.getValidToken(tokenConfig);
       expect(token2).toBe('second-token');
-      expect(mockAxios.history.post.length).toBe(2);
     });
   });
 
   describe('config and token consistency', () => {
-    it('should invalidate token cache when config changes', async () => {
+    it('应该配置变更后作废旧 Token 缓存（configFingerprint）', async () => {
       // 1. 初始化第一个配置
       await configService.init({
         tenantId: 'first-tenant-12345678',
@@ -246,15 +280,16 @@ describe('Auth Flow Integration', () => {
         env: 'sandbox',
       });
 
-      // 2. 设置 mock API
-      mockAxios.onPost(/open-auth\/authorize\/token/).reply(200, {
-        access_token: 'first-token',
-        expires_in: 3600,
+      setupStandardMocks(mockAxios, {
+        tokenResponse: {
+          code: '00000',
+          message: '成功',
+          data: { access_token: 'first-token', expire: 3600 },
+        },
       });
 
-      // 3. 获取 Token
       const config1 = await configService.getConfig({ decryptSensitive: true });
-      const tokenConfig1 = {
+      const tokenConfig1: TokenConfig = {
         tenantId: config1.tenantId!,
         appKey: config1.appKey!,
         appSecret: config1.appSecret!,
@@ -264,26 +299,25 @@ describe('Auth Flow Integration', () => {
       const token1 = await tokenManager.getValidToken(tokenConfig1);
       expect(token1).toBe('first-token');
 
-      // 4. 更新配置（不同的 tenantId/appKey/appSecret）
+      // 2. 更新配置
       await configService.setConfig('tenantId', 'second-tenant-12345678');
       await configService.setConfig('appKey', 'second-app-key-12345678');
       await configService.setConfig('appSecret', 'second-app-secret-1234567890');
 
-      // 5. 使用新配置
+      // 3. 使用新配置加载缓存 → 缓存应无效（configFingerprint 不匹配）
       const config2 = await configService.getConfig({ decryptSensitive: true });
-      const tokenConfig2 = {
+      const tokenConfig2: TokenConfig = {
         tenantId: config2.tenantId!,
         appKey: config2.appKey!,
         appSecret: config2.appSecret!,
         env: config2.env!,
       };
 
-      // 6. 旧的缓存应该无效，重新获取 Token
       const cachedToken = await tokenManager.loadFromCache(tokenConfig2);
-      expect(cachedToken).toBeNull(); // 配置指纹不匹配
+      expect(cachedToken).toBeNull();
     });
 
-    it('should handle multiple environments', async () => {
+    it('应该支持 sandbox / production 环境切换', async () => {
       // 1. 测试 sandbox 环境
       await configService.init({
         tenantId: 'sandbox-tenant-12345678',
@@ -292,9 +326,12 @@ describe('Auth Flow Integration', () => {
         env: 'sandbox',
       });
 
-      mockAxios.onPost(/open-auth\/authorize\/token/).reply(200, {
-        access_token: 'sandbox-token',
-        expires_in: 3600,
+      setupStandardMocks(mockAxios, {
+        tokenResponse: {
+          code: '00000',
+          message: '成功',
+          data: { access_token: 'sandbox-token', expire: 3600 },
+        },
       });
 
       const sandboxConfig = await configService.getConfig({ decryptSensitive: true });
@@ -304,25 +341,17 @@ describe('Auth Flow Integration', () => {
         appSecret: sandboxConfig.appSecret!,
         env: 'sandbox',
       });
-
       expect(sandboxToken).toBe('sandbox-token');
 
-      // 2. 更新为 production 环境
+      // 2. 切换到 production 环境（只验证配置层，不重新获取）
       await configService.setConfig('env', 'production');
-
-      // 注意：BIP 的不同环境使用不同的 API URL
-      // production: https://api.yonyoucloud.com
-      // sandbox: https://api-di.yonyoucloud.com
-
-      // 这里主要验证配置可以切换
       const prodConfig = await configService.getConfig({ decryptSensitive: true });
       expect(prodConfig.env).toBe('production');
     });
   });
 
   describe('error handling and recovery', () => {
-    it('should recover from network error', async () => {
-      // 1. 初始化配置
+    it('应该从网络错误中恢复', async () => {
       await configService.init({
         tenantId: 'test-tenant-12345678',
         appKey: 'test-app-key-12345678',
@@ -330,33 +359,43 @@ describe('Auth Flow Integration', () => {
         env: 'sandbox' as 'sandbox' | 'production',
       });
 
-      // 2. 第一次请求失败
-      mockAxios.onPost(/open-auth\/authorize\/token/).networkErrorOnce();
+      // 数据中心查询成功
+      mockAxios.onGet(/getGatewayAddress/).reply(200, {
+        code: '00000',
+        message: '成功',
+        data: {
+          gatewayUrl: 'https://test-gateway.example.com',
+          tokenUrl: 'https://test-token.example.com',
+        },
+      });
 
-      // 3. 第二次请求成功
-      mockAxios.onPost(/open-auth\/authorize\/token/).reply(200, {
-        access_token: 'recovered-token',
-        expires_in: 3600,
+      // 第一次 token 请求：网络错误
+      mockAxios.onGet(/getAccessToken/).networkErrorOnce();
+
+      // 第二次 token 请求：成功
+      mockAxios.onGet(/getAccessToken/).reply(200, {
+        code: '00000',
+        message: '成功',
+        data: { access_token: 'recovered-token', expire: 3600 },
       });
 
       const config = await configService.getConfig({ decryptSensitive: true });
-      const tokenConfig = {
+      const tokenConfig: TokenConfig = {
         tenantId: config.tenantId!,
         appKey: config.appKey!,
         appSecret: config.appSecret!,
         env: config.env!,
       };
 
-      // 4. 第一次应该失败
+      // 第一次应该失败
       await expect(tokenManager.getValidToken(tokenConfig)).rejects.toThrow(AuthError);
 
-      // 5. 第二次应该成功
+      // 第二次应该成功
       const token = await tokenManager.getValidToken(tokenConfig);
       expect(token).toBe('recovered-token');
     });
 
-    it('should handle token refresh failure', async () => {
-      // 1. 初始化配置
+    it('应该处理 Token 刷新失败', async () => {
       await configService.init({
         tenantId: 'test-tenant-12345678',
         appKey: 'test-app-key-12345678',
@@ -364,14 +403,17 @@ describe('Auth Flow Integration', () => {
         env: 'sandbox' as 'sandbox' | 'production',
       });
 
-      // 2. 获取初始 Token
-      mockAxios.onPost(/open-auth\/authorize\/token/).reply(200, {
-        access_token: 'initial-token',
-        expires_in: 3600,
+      // 首次获取成功
+      setupStandardMocks(mockAxios, {
+        tokenResponse: {
+          code: '00000',
+          message: '成功',
+          data: { access_token: 'initial-token', expire: 3600 },
+        },
       });
 
       const config = await configService.getConfig({ decryptSensitive: true });
-      const tokenConfig = {
+      const tokenConfig: TokenConfig = {
         tenantId: config.tenantId!,
         appKey: config.appKey!,
         appSecret: config.appSecret!,
@@ -381,20 +423,32 @@ describe('Auth Flow Integration', () => {
       const token = await tokenManager.getValidToken(tokenConfig);
       expect(token).toBe('initial-token');
 
-      // 3. 设置过期并刷新失败
-      mockAxios.onPost(/open-auth\/authorize\/token/).reply(401, {
+      // 重置 mock 让刷新失败
+      mockAxios.reset();
+      mockAxios.onGet(/getGatewayAddress/).reply(200, {
+        code: '00000',
+        message: '成功',
+        data: {
+          gatewayUrl: 'https://test-gateway.example.com',
+          tokenUrl: 'https://test-token.example.com',
+        },
+      });
+      mockAxios.onGet(/getAccessToken/).reply(401, {
         code: 'INVALID_CREDENTIALS',
         message: 'Credentials expired',
       });
 
-      const expiredToken = {
-        access_token: 'expired',
-        expires_in: 3600,
-        expires_at: Date.now() - 1000,
-      };
-      await tokenManager.saveToCache(expiredToken, tokenConfig);
+      // 写入过期 token 强制刷新
+      await tokenManager.saveToCache(
+        {
+          access_token: 'expired',
+          expires_in: 3600,
+          expires_at: Date.now() - 1000,
+        },
+        tokenConfig
+      );
 
-      // 4. 刷新应该失败
+      // 刷新应该失败
       await expect(tokenManager.getValidToken(tokenConfig)).rejects.toThrow(AuthError);
     });
   });
