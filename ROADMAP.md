@@ -1,5 +1,7 @@
 # 下一步行动计划
 
+> ⚠️ 上半部分（Phase 2 历史）保留作为归档。**最新待办见文末「Phase 3 待办清单（2026-06-17）」**。
+
 ---
 
 ## 📋 当前项目状态
@@ -646,3 +648,153 @@ describe('Real API E2E', () => {
 ---
 
 **准备好后，启动 Agent 执行任务 1：CLI命令适配！**
+---
+
+## 📋 Phase 3 待办清单（2026-06-17）
+
+> 截至 2026-06-17，Phase 1-2 全部完成，所有 CR-001 ~ CR-051 已处理。下面是下一阶段可处理的事项，按"价值/时间"比排序。
+
+### 🔴 P0 高 ROI（单次 < 1 小时）
+
+#### 待办-001：同步生成器模板到新架构
+- **跟踪**：CR-047（增强）+ 沿用 CR-001/CR-041 修复思路
+- **文件**：`scripts/generate-commands.ts`
+- **问题**：当前模板仍生成旧模式（`new XxxApi(configuration)` + `process.exit(1)`）。下次 `npm run generate:commands` 会重新引入已修复的问题。
+- **改动**：
+  - 模板改为生成 `new ApiHttpWrapper()` + `wrapper.call({method, path, params})` 模式
+  - 错误处理统一为 `handleErrorAndExit`
+  - 移除每个生成命令的 `process.exit(1)`
+- **工作量**：约 30 分钟（含 1 次端到端重生成验证）
+- **价值**：⭐⭐⭐⭐⭐（防回归，让 Phase 3 加新域变得安全）
+
+#### 待办-002：真正删除 auth-interceptor
+- **跟踪**：CR-042
+- **文件**：`src/infrastructure/http/auth-interceptor.ts`
+- **现状**：已标记 `@deprecated`，但代码仍在，含 10 处 `any`
+- **改动**：
+  - 确认无业务引用（业务已用 `ApiHttpWrapper`）
+  - 删除文件 + 从 `index.ts` 移除导出
+  - 更新 `tests/unit/infrastructure/http/auth-interceptor.test.ts`（删除或保留为基类测试）
+- **工作量**：约 15 分钟
+- **价值**：⭐⭐⭐⭐（清掉 10 处 `any` 风险 + 减少包体积）
+
+#### 待办-003：清理剩余 ESLint 真实错误
+- **跟踪**：CR-015 剩余（生成代码部分）
+- **现状**：当前 129 个真实错误，全部来自 `src/api/generated/` 和 `typescript-eslint/no-unsafe-*`
+- **改动**：
+  - 生成代码可加 `.eslintignore` 或调 `.eslintrc.js` 忽略 generated/
+  - 手写代码剩余错误逐个修复
+- **工作量**：约 30 分钟
+- **价值**：⭐⭐⭐（让 `npm run lint` 干净）
+
+---
+
+### 🟡 P1 中等 ROI（半天）
+
+#### 待办-004：补 ApiClientService 注入重构
+- **跟踪**：CR-009
+- **文件**：`src/services/api/api-http-wrapper.ts`、`src/services/api/api-client-service.ts`
+- **问题**：当前 `ApiHttpWrapper` 内部 `new ApiClientService()`，每次命令执行都新建实例，`cachedGatewayUrl` 缓存无法跨命令共享
+- **改动**：
+  - 改为构造函数注入（DI）
+  - `bootstrap()` 中创建共享 `ApiClientService` 单例
+  - 通过闭包/context 注入到命令
+- **工作量**：约 2 小时
+- **价值**：⭐⭐⭐⭐（首命令后跳过数据中心查询，加速 200ms+）
+
+#### 待办-005：补 update-checker 退出码契约测试
+- **跟踪**：CR-044 增强
+- **文件**：`tests/unit/services/update/update-checker.test.ts`
+- **改动**：补 1-2 个用例验证网络错误时返回退出码 0（静默失败契约）
+- **工作量**：约 30 分钟
+- **价值**：⭐⭐（防退化）
+
+#### 待办-006：补 update-checker 改用 FileStorage
+- **跟踪**：CR-011
+- **文件**：`src/services/update/update-checker.ts`
+- **问题**：直接用 `fs.readFileSync`/`fs.writeFileSync` 操作 `~/.ybc/update-check.json`，绕过 `FileStorage`，违反 architecture.md §1 "Service 层不直接读写 ~/.ybc/*.json"
+- **改动**：重构为 `FileStorage` + 设 600 权限
+- **工作量**：约 1 小时
+- **价值**：⭐⭐⭐⭐（架构一致性 + 安全性）
+
+#### 待办-007：补 TokenManager 并发控制
+- **跟踪**：CR-019
+- **文件**：`src/services/auth/token-manager.ts`
+- **问题**：`getValidToken()` 没有并发保护。多个命令同时触发 Token 刷新会导致多次冗余请求
+- **改动**：引入 `refreshPromise: Promise<string> | null` 单例，后续调用复用同一个 Promise
+- **工作量**：约 1 小时
+- **价值**：⭐⭐⭐（防批量调用场景的 N 倍请求）
+
+---
+
+### 🟢 P2 长期规划（1-2 周，进 ROADMAP 主路线）
+
+#### 待办-008：Phase 3 voucher 域（凭证管理）
+- **来源**：requirements.md §3 列为待启动
+- **范围**：
+  - `openapi/openapi.yaml` 加 voucher 端点（凭证查询、创建、审核、过账）
+  - `npm run generate:api` + `npm run generate:commands`
+  - 生成 5-10 个新命令（前提：待办-001 已完成）
+  - 补单元/集成/E2E 测试
+- **工作量**：约 3-5 天
+- **价值**：⭐⭐⭐⭐⭐（业务扩展，覆盖 BIP 核心域）
+
+#### 待办-009：批量调用 `ybc batch -f file.json`
+- **来源**：requirements.md §3 列为 P2
+- **范围**：
+  - 设计批量请求 JSON schema
+  - 实现 `ybc batch` 命令
+  - 支持并发控制（关联待办-007）
+  - 失败重试 + 部分成功报告
+- **工作量**：约 2-3 天
+- **价值**：⭐⭐⭐⭐（数据同步场景核心能力）
+
+#### 待办-010：命令搜索 `ybc search <kw>`
+- **来源**：requirements.md §3 列为 P1
+- **范围**：
+  - 索引所有 OpenAPI 端点的 summary/description
+  - 实现 `ybc search <keyword>` 模糊匹配
+  - 输出匹配的命令及 help 链接
+- **工作量**：约 1 天
+- **价值**：⭐⭐⭐（300+ API 场景下的发现能力）
+
+#### 待办-011：Phase 4 大模型友好
+- **来源**：requirements.md §3 列为 P1
+- **范围**：
+  - `--help-json` 输出 JSON Schema（让 AI Agent 解析命令结构）
+  - `--template @file.json` 模板参数
+  - 插件机制 `@ybc-plugin/*`
+- **工作量**：约 1 周
+- **价值**：⭐⭐⭐⭐⭐（AI Agent 集成的核心入口）
+
+---
+
+### 📊 推荐执行顺序
+
+```
+第 1 步（半天）：待办-001 + 待办-002 + 待办-003
+  → 清掉技术债，让后续加新域安全
+      ↓
+第 2 步（1 天）：待办-006 + 待办-007 + 待办-004
+  → 架构治理，加速 + 并发安全
+      ↓
+第 3 步（1 周）：待办-008（voucher 域）
+  → 业务扩展，覆盖 BIP 核心域
+      ↓
+第 4 步（按需）：待办-009 / 待办-010 / 待办-011
+  → 高级能力，按用户反馈推进
+```
+
+### 🎯 立即可做
+
+**最快见效**：待办-001（同步生成器模板，30 分钟）+ 待办-002（删除 auth-interceptor，15 分钟），合计 45 分钟，让代码库进入"无技术债"状态。
+
+### 📝 版本节奏建议
+
+| 版本 | 范围 | 预计 |
+|------|------|------|
+| v0.1.10 | 待办-001/002/003（技术债清理）| 1 天 |
+| v0.2.0 | 待办-004/006/007（架构治理）| 2-3 天 |
+| v0.3.0 | 待办-008（voucher 域）| 1 周 |
+| v1.0.0 | 待办-009/010/011（高级能力）| 2-3 周 |
+
