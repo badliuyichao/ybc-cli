@@ -1,8 +1,12 @@
 /**
  * 禁用员工
  *
- * API 端点：POST /staff/{id}/disable
+ * 自动生成自 StaffApi.disableStaff() （POST /staff/{id}/disable）
+ * 此文件由命令生成器自动生成，请勿手动修改
+ *
+ * 待办-001（2026-06-17）：使用 ApiHttpWrapper + handleErrorAndExit 模式
  */
+
 import { Command } from 'commander';
 import { ApiHttpWrapper } from '../../../../services/api/api-http-wrapper';
 import { OutputManager } from '../../../../cli/output';
@@ -17,17 +21,22 @@ export function registerStaffApiDisableStaffCommand(parent: Command) {
     .option('--format <json|table|csv|raw>', '输出格式')
     .option('--raw', '仅输出服务端原始 JSON')
     .option('--verbose', '输出详细调试日志')
-    .requiredOption('--id <id>', '员工 ID')
+    .option('--id <id>', 'id')
     .action(async (options) => {
       try {
         const wrapper = new ApiHttpWrapper();
         const data = await wrapper.call({
           method: 'POST',
-          path: `/staff/${options.id}/disable`,
+          path: `/staff/${options.id}/disable`
         });
 
+        // CR-016: 统一业务成功码判断
         const responseData = data as { code?: string; message?: string };
-        if (responseData.code && responseData.code !== 'SUCCESS' && responseData.code !== '00000') {
+        const successCodes = ['200', '00000', 'SUCCESS', ''];
+        if (
+          responseData.code &&
+          !successCodes.includes(responseData.code)
+        ) {
           throw new BusinessError(responseData.message || '业务操作失败', {
             businessCode: responseData.code,
           });

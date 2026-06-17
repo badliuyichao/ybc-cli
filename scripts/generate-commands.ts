@@ -6,9 +6,13 @@
  *
  * 执行步骤：
  * 1. 读取 src/api/generated/api.ts
- * 2. 解析 API 类和方法
- * 3. 为每个 API 方法生成 CLI 命令文件
+ * 2. 从 AxiosParamCreator 块解析每个 API 方法（含 HTTP method / path / 参数）
+ * 3. 为每个 API 方法生成 ApiHttpWrapper 模式的 CLI 命令文件
  * 4. 命令文件位于 src/cli/commands/generated/
+ *
+ * 待办-001（2026-06-17）：模板从旧的 `new XxxApi(configuration)` + `process.exit(1)`
+ * 模式改为 `ApiHttpWrapper.call({method, path, params})` + `handleErrorAndExit` 模式。
+ * 这样重生成不会再引入 CR-001/CR-041 已修复的问题。
  */
 
 import { readFileSync, writeFileSync, existsSync, mkdirSync, rmSync } from 'fs';
@@ -43,15 +47,22 @@ console.log();
 // 步骤 3: 解析 API 文件
 console.log('⚙️  步骤 3: 解析 API 文件');
 
+type HttpMethod = 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH';
+
+interface ApiParameter {
+  name: string;
+  required: boolean;
+}
+
 interface ApiMethod {
   name: string;
   summary: string;
-  parameters: Array<{
-    name: string;
-    required: boolean;
-    description?: string;
-  }>;
+  parameters: ApiParameter[];
   returnType: string;
+  httpMethod: HttpMethod;
+  pathTemplate: string; // 如 `/staff/{id}/enable` 或 `/yonbip/digitalModel/staff/detail`
+  pathParams: string[]; // 出现在 path 模板 {x} 中的参数名
+  bodyParam?: string; // 请求体参数名（如 todoCreateRequest）
 }
 
 interface ApiClass {
@@ -59,89 +70,101 @@ interface ApiClass {
   methods: ApiMethod[];
 }
 
-// 解析 API 文件，提取类和方法信息
+const classNames = ['StaffApi', 'TodoApi'];
+
+/**
+ * 解析 API 文件，从 AxiosParamCreator 块提取每个方法的完整信息。
+ *
+ * AxiosParamCreator 每个方法块的固定结构：
+ *   methodName: async (params, options): Promise<RequestArgs> => {
+ *       const localVarPath = `/staff/{id}/enable`.replace(`{${"id"}}`, ...);
+ *       const localVarRequestOptions = { method: 'POST', ...};
+ *       localVarRequestOptions.data = serializeDataIfNeeded(todoCreateRequest, ...)
+ *   }
+ */
 function parseApiFileSimple(content: string): ApiClass[] {
   const apiClasses: ApiClass[] = [];
 
-  // 查找所有 API 类
-  const classNames = ['StaffApi', 'TodoApi'];
-
   for (const className of classNames) {
+    // 定位 AxiosParamCreator 块范围
+    const creatorStart = content.indexOf(`export const ${className}AxiosParamCreator = function`);
+    if (creatorStart === -1) continue;
     const classStart = content.indexOf(`export class ${className} extends BaseAPI`);
-    if (classStart === -1) continue;
+    const creatorEnd = classStart === -1 ? content.length : classStart;
+    const creatorBlock = content.substring(creatorStart, creatorEnd);
 
-    // 找到类的结束位置
-    let braceCount = 0;
-    let classEnd = classStart;
-    let foundFirstBrace = false;
-
-    for (let i = classStart; i < content.length; i++) {
-      if (content[i] === '{') {
-        braceCount++;
-        foundFirstBrace = true;
-      } else if (content[i] === '}') {
-        braceCount--;
-        if (foundFirstBrace && braceCount === 0) {
-          classEnd = i;
-          break;
-        }
-      }
-    }
-
-    const classBody = content.substring(classStart, classEnd);
-
-    // 提取公共方法
-    const methodRegex = /public (\w+)\(([^)]*)\)/g;
+    // 在 creator 块内查找所有方法定义
+    // 方法签名：methodName: async (...) => {
+    const methodSigRegex = /(\w+):\s*async\s*\(([^)]*)\)\s*:\s*Promise<RequestArgs>\s*=>\s*\{/g;
     const methods: ApiMethod[] = [];
     let methodMatch;
 
-    while ((methodMatch = methodRegex.exec(classBody)) !== null) {
+    while ((methodMatch = methodSigRegex.exec(creatorBlock)) !== null) {
       const methodName = methodMatch[1];
       const paramsStr = methodMatch[2];
+      const methodBodyStart = methodMatch.index! + methodMatch[0].length;
+      // 方法体取后续 2500 字符足够覆盖 path/method/data 三处信息
+      const methodBody = creatorBlock.substring(methodBodyStart, methodBodyStart + 2500);
 
-      // 解析参数
-      const parameters: ApiMethod['parameters'] = [];
+      // 解析方法参数（去掉 options）
+      const parameters: ApiParameter[] = [];
       if (paramsStr.trim()) {
-        const paramList = paramsStr.split(',').map(p => p.trim()).filter(p => p);
-
+        const paramList = paramsStr.split(',').map((p) => p.trim()).filter((p) => p);
         for (const param of paramList) {
           const colonIndex = param.indexOf(':');
           if (colonIndex === -1) continue;
-
           const paramName = param.substring(0, colonIndex).trim().replace('?', '');
-          const required = !param.includes('?');
-
-          // 跳过 options 参数
           if (paramName === 'options') continue;
-
-          parameters.push({
-            name: paramName,
-            required,
-          });
+          const required = !param.includes('?');
+          parameters.push({ name: paramName, required });
         }
       }
 
-      // 从 API 文件中查找方法的 summary 注释
-      // 方法：向前搜索到方法定义，然后查找其 JSDoc 注释
-      const methodStartInContent = classStart + methodMatch.index;
-      const searchStart = Math.max(0, methodStartInContent - 500);
-      const beforeMethod = content.substring(searchStart, methodStartInContent);
-
-      // 提取 @summary
+      // 提取 @summary（方法注释里有，在 AxiosParamCreator 里方法前有 JSDoc）
+      const beforeMethod = creatorBlock.substring(
+        Math.max(0, methodMatch.index! - 500),
+        methodMatch.index!
+      );
       const summaryRegex = /@summary\s+([^\n*]+)/;
       const summaryMatch = summaryRegex.exec(beforeMethod);
       const summary = summaryMatch ? summaryMatch[1].trim() : methodName;
 
-      // 提取返回类型
-      const returnRegex = /\)\s*:\s*Promise<([^>]+)>/;
-      const returnMatch = returnRegex.exec(classBody.substring(methodMatch.index));
-      const returnType = returnMatch ? returnMatch[1] : 'any';
+      // 提取 HTTP method
+      const methodRegex = /method:\s*'([A-Z]+)'/;
+      const methodResult = methodRegex.exec(methodBody);
+      const httpMethod = (methodResult?.[1] as HttpMethod) || 'GET';
+
+      // 提取 path 模板：const localVarPath = `xxx`
+      const pathRegex = /const localVarPath\s*=\s*`([^`]+)`/;
+      const pathResult = pathRegex.exec(methodBody);
+      const pathTemplate = pathResult?.[1] || '/';
+
+      // 提取 path 参数：.replace(`{${"X"}}`, ...)
+      const pathParams: string[] = [];
+      // 用 RegExp 构造函数避免反引号在 TS 模板字符串里被误解析
+      const pathParamRegex = new RegExp(String.raw`\.replace\(\`\{\$\{"(\w+)"\}\}\``, 'g');
+      let ppm;
+      while ((ppm = pathParamRegex.exec(methodBody)) !== null) {
+        pathParams.push(ppm[1]);
+      }
+
+      // 提取 body 参数：serializeDataIfNeeded(X, ...)
+      const bodyRegex = /serializeDataIfNeeded\((\w+),/;
+      const bodyResult = bodyRegex.exec(methodBody);
+      const bodyParam = bodyResult?.[1];
+
+      // 提取返回类型（从 class body 不再需要，这里保留兼容字段）
+      const returnType = 'unknown';
 
       methods.push({
         name: methodName,
         summary,
         parameters,
         returnType,
+        httpMethod,
+        pathTemplate,
+        pathParams,
+        bodyParam,
       });
     }
 
@@ -160,7 +183,9 @@ console.log(`✅ 解析完成，发现 ${apiClasses.length} 个 API 类:`);
 for (const apiClass of apiClasses) {
   console.log(`  - ${apiClass.name}: ${apiClass.methods.length} 个方法`);
   for (const method of apiClass.methods) {
-    console.log(`    • ${method.name}(): ${method.summary}`);
+    console.log(
+      `    • ${method.name}() [${method.httpMethod} ${method.pathTemplate}]: ${method.summary}`
+    );
   }
 }
 console.log();
@@ -168,99 +193,136 @@ console.log();
 // 步骤 4: 生成 CLI 命令文件
 console.log('📦 步骤 4: 生成 CLI 命令文件');
 
-function generateCommandFile(
-  className: string,
-  method: ApiMethod
-): string {
+/**
+ * 把 path 模板中的 {param} 替换为 ${options.param}，返回可放进反引号的字符串字面量。
+ * 例：'/staff/{id}/enable' → `/staff/${options.id}/enable`
+ */
+function buildPathExpression(pathTemplate: string): string {
+  if (!/\{(\w+)\}/.test(pathTemplate)) {
+    // 无 path 参数，用单引号字符串即可
+    return `'${pathTemplate}'`;
+  }
+  const interpolated = pathTemplate.replace(/\{(\w+)\}/g, '${options.$1}');
+  return `\`${interpolated}\``;
+}
+
+function generateCommandFile(className: string, method: ApiMethod): string {
   // 提取简化的命令名称（去掉重复的域前缀）
   // 例如：queryStaff -> query, enableStaff -> enable, listTodos -> list
   let commandName = method.name;
   const apiName = className.replace(/Api$/, ''); // Staff, Todo
-
-  // 去掉方法名中的域后缀（Staff/Todo）
-  // 例如：queryStaff -> query, listTodos -> list
   if (commandName.endsWith(apiName)) {
     commandName = commandName.substring(0, commandName.length - apiName.length);
   }
-
-  // 如果命令名为空或单字符，使用原方法名
   if (!commandName || commandName.length < 2) {
     commandName = method.name;
   }
 
   const functionName = `register${className}${method.name.charAt(0).toUpperCase() + method.name.slice(1)}Command`;
 
+  // 业务参数 = 签名参数 - path 参数 - body 参数
+  const pathParamSet = new Set(method.pathParams);
+  const queryParameters = method.parameters.filter(
+    (p) => !pathParamSet.has(p.name) && p.name !== method.bodyParam
+  );
+  const bodyParameter = method.bodyParam
+    ? method.parameters.find((p) => p.name === method.bodyParam)
+    : undefined;
+
   // 生成参数选项
-  const optionsCode = method.parameters
-    .map(param => {
-      const flags = param.required ? `<${param.name}>` : `[${param.name}]`;
-      return `    .option('--${param.name} ${flags}', '${param.name}')`;
-    })
-    .join('\n');
+  const optionsLines: string[] = [];
+  for (const param of method.parameters) {
+    const desc = param.name === method.bodyParam ? `${param.name} (JSON 字符串)` : param.name;
+    const flags = param.required ? `<${param.name}>` : `[${param.name}]`;
+    optionsLines.push(`    .option('--${param.name} ${flags}', '${desc}')`);
+  }
+  const optionsCode = optionsLines.length > 0 ? optionsLines.join('\n') : '    // 无参数';
 
-  // 生成 API 调用参数
-  const argsList = method.parameters.map(p => `options.${p.name}`).join(', ');
-
-  // CR-001:全局选项必须在每个子命令上显式声明,因为 commander 的子命令
-  // action 回调里 `options` 不继承父级 option(program.ts 注册的根 program
-  // --format 在子命令里看不到)
+  // CR-001:全局选项必须在每个子命令上显式声明
   const globalOptionsCode = `    .option('--format <json|table|csv|raw>', '输出格式')
     .option('--raw', '仅输出服务端原始 JSON')
     .option('--verbose', '输出详细调试日志')`;
 
+  // 构造 path 表达式
+  const pathExpr = buildPathExpression(method.pathTemplate);
+
+  // 构造 call() 参数
+  const callParts: string[] = [`          method: '${method.httpMethod}'`, `          path: ${pathExpr}`];
+
+  // query 参数 → params 对象
+  if (queryParameters.length > 0) {
+    const paramLines = queryParameters.map((p) => `            ${p.name}: options.${p.name}`);
+    callParts.push(`          params: {\n${paramLines.join(',\n')}\n          }`);
+  }
+
+  // body 参数 → JSON.parse
+  if (bodyParameter) {
+    callParts.push(
+      `          body: options.${bodyParameter.name} ? JSON.parse(options.${bodyParameter.name}) : undefined`
+    );
+  }
+
+  const callArgs = `{\n${callParts.join(',\n')}\n        }`;
+
   return `/**
  * ${method.summary}
  *
- * 自动生成自 ${className}.${method.name}()
+ * 自动生成自 ${className}.${method.name}() （${method.httpMethod} ${method.pathTemplate}）
  * 此文件由命令生成器自动生成，请勿手动修改
+ *
+ * 待办-001（2026-06-17）：使用 ApiHttpWrapper + handleErrorAndExit 模式
  */
 
 import { Command } from 'commander';
-import { ${className} } from '../../../../api/generated';
+import { ApiHttpWrapper } from '../../../../services/api/api-http-wrapper';
 import { OutputManager } from '../../../../cli/output';
-import { ApiClientService } from '../../../../services/api/api-client-service';
+import { handleErrorAndExit, BusinessError } from '../../../../services/error';
 
 const outputManager = new OutputManager();
-const apiClientService = new ApiClientService();
 
 export function ${functionName}(parent: Command) {
   parent
     .command('${commandName}')
     .description('${method.summary}')
 ${globalOptionsCode}
-${optionsCode || '    // 无参数'}
+${optionsCode}
     .action(async (options) => {
       try {
-        // 获取配置好的 API 客户端（使用正确的 gatewayUrl）
-        const configuration = await apiClientService.getConfiguration();
-        const api = new ${className}(configuration);
-        const result = await api.${method.name}(${argsList});
+        const wrapper = new ApiHttpWrapper();
+        const data = await wrapper.call(${callArgs});
 
-        // 输出结果
-        outputManager.output(result.data, options.format);
+        // CR-016: 统一业务成功码判断
+        const responseData = data as { code?: string; message?: string };
+        const successCodes = ['200', '00000', 'SUCCESS', ''];
+        if (
+          responseData.code &&
+          !successCodes.includes(responseData.code)
+        ) {
+          throw new BusinessError(responseData.message || '业务操作失败', {
+            businessCode: responseData.code,
+          });
+        }
+
+        outputManager.output(responseData, options.format);
       } catch (error) {
-        console.error('Error:', error);
-        process.exit(1);
+        handleErrorAndExit(error instanceof Error ? error : new Error(String(error)));
       }
     });
 }
 `;
 }
 
-function generateIndexFile(
-  className: string,
-  methods: ApiMethod[]
-): string {
+function generateIndexFile(className: string, methods: ApiMethod[]): string {
   const imports = methods
     .map(
-      method =>
+      (method) =>
         `import { register${className}${method.name.charAt(0).toUpperCase() + method.name.slice(1)}Command } from './${method.name}';`
     )
     .join('\n');
 
   const registrations = methods
     .map(
-      method =>
+      (method) =>
         `  register${className}${method.name.charAt(0).toUpperCase() + method.name.slice(1)}Command(command);`
     )
     .join('\n');

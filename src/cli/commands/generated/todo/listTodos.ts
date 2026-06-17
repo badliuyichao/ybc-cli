@@ -1,17 +1,18 @@
 /**
  * 获取待办列表
  *
- * 自动生成自 TodoApi.listTodos()
+ * 自动生成自 TodoApi.listTodos() （GET /todo/list）
  * 此文件由命令生成器自动生成，请勿手动修改
+ *
+ * 待办-001（2026-06-17）：使用 ApiHttpWrapper + handleErrorAndExit 模式
  */
 
 import { Command } from 'commander';
-import { TodoApi } from '../../../../api/generated';
+import { ApiHttpWrapper } from '../../../../services/api/api-http-wrapper';
 import { OutputManager } from '../../../../cli/output';
-import { ApiClientService } from '../../../../services/api/api-client-service';
+import { handleErrorAndExit, BusinessError } from '../../../../services/error';
 
 const outputManager = new OutputManager();
-const apiClientService = new ApiClientService();
 
 export function registerTodoApiListTodosCommand(parent: Command) {
   parent
@@ -27,16 +28,34 @@ export function registerTodoApiListTodosCommand(parent: Command) {
     .option('--pageSize [pageSize]', 'pageSize')
     .action(async (options) => {
       try {
-        // 获取配置好的 API 客户端（使用正确的 gatewayUrl）
-        const configuration = await apiClientService.getConfiguration();
-        const api = new TodoApi(configuration);
-        const result = await api.listTodos(options.status, options.priority, options.assignee, options.page, options.pageSize);
+        const wrapper = new ApiHttpWrapper();
+        const data = await wrapper.call({
+          method: 'GET',
+          path: '/todo/list',
+          params: {
+            status: options.status,
+            priority: options.priority,
+            assignee: options.assignee,
+            page: options.page,
+            pageSize: options.pageSize
+          }
+        });
 
-        // 输出结果
-        outputManager.output(result.data, options.format);
+        // CR-016: 统一业务成功码判断
+        const responseData = data as { code?: string; message?: string };
+        const successCodes = ['200', '00000', 'SUCCESS', ''];
+        if (
+          responseData.code &&
+          !successCodes.includes(responseData.code)
+        ) {
+          throw new BusinessError(responseData.message || '业务操作失败', {
+            businessCode: responseData.code,
+          });
+        }
+
+        outputManager.output(responseData, options.format);
       } catch (error) {
-        console.error('Error:', error);
-        process.exit(1);
+        handleErrorAndExit(error instanceof Error ? error : new Error(String(error)));
       }
     });
 }
