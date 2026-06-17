@@ -551,7 +551,11 @@ describe('TokenManager', () => {
       expect(exists).toBe(true);
 
       // 验证文件内容
-      const cache = await storage.read(cachePath);
+      const cache = await storage.read<{
+        token: { access_token: string };
+        timestamp: number;
+        configFingerprint: string;
+      }>(cachePath);
       expect(cache.token.access_token).toBe('test-token');
       expect(cache.timestamp).toBeDefined();
       expect(cache.configFingerprint).toBeDefined();

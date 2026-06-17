@@ -5,7 +5,6 @@
  * 参数：id 和 code 至少传其一
  */
 import { Command } from 'commander';
-import chalk from 'chalk';
 import { ApiHttpWrapper } from '../../../../services/api/api-http-wrapper';
 import { OutputManager } from '../../../../cli/output';
 import { handleErrorAndExit, BusinessError } from '../../../../services/error';
@@ -22,15 +21,14 @@ export function registerStaffApiQueryStaffCommand(parent: Command) {
     .option('--id [id]', '员工 ID（id 和 code 至少传其一）')
     .option('--code [code]', '员工编码（id 和 code 至少传其一）')
     .action(async (options) => {
-      if (!options.id && !options.code) {
-        console.error(chalk.red('错误：id 和 code 参数至少需要传入一个'));
-        console.log('');
-        console.log('用法：ybc staff query --id <员工ID>');
-        console.log('      ybc staff query --code <员工编码>');
-        process.exit(1);
-      }
-
       try {
+        if (!options.id && !options.code) {
+          throw new BusinessError(
+            'id 和 code 参数至少需要传入一个。用法：ybc staff query --id <员工ID> 或 --code <员工编码>',
+            { businessCode: 'MISSING_PARAM' }
+          );
+        }
+
         const params: Record<string, string> = {};
         if (options.id) params.id = options.id;
         if (options.code) params.code = options.code;

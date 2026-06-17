@@ -54,7 +54,7 @@ describe('ConfigService', () => {
 
       // 读取配置文件
       const configPath = path.join(tempDir, 'config.json');
-      const rawConfig = await storage.read(configPath);
+      const rawConfig = await storage.read<{ appSecret?: string }>(configPath);
 
       // 验证 SK 已加密（不是原始值）
       expect(rawConfig.appSecret).not.toBe(validConfig.appSecret);
@@ -188,7 +188,7 @@ describe('ConfigService', () => {
 
       // 验证文件中的 SK 是加密的
       const configPath = path.join(tempDir, 'config.json');
-      const rawConfig = await storage.read(configPath);
+      const rawConfig = await storage.read<{ appSecret?: string }>(configPath);
       expect(rawConfig.appSecret).not.toBe(newSk);
     });
 

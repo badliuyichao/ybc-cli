@@ -2,9 +2,11 @@
  * 文件存储服务
  *
  * 提供安全的文件读写操作，支持权限控制和错误处理
+ *
+ * CR-015（2026-06-17）：消除 any
+ * - read/write 用泛型 T 替代 any
+ * - 用 NodeJS.ErrnoException 类型替代 (error as any).code
  */
-
-/* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/explicit-module-boundary-types */
 
 import * as fs from 'fs';
 import * as path from 'path';
@@ -28,12 +30,12 @@ export class FileStorage {
   };
 
   /**
-   * 读取文件内容
+   * 读取文件内容（已解析 JSON）
    * @param filePath 文件路径
-   * @returns 文件内容（已解析 JSON）
+   * @returns 文件内容（已解析 JSON，类型由泛型 T 推导）
    * @throws StorageError 文件不存在或解析失败
    */
-  async read(filePath: string): Promise<any> {
+  async read<T = unknown>(filePath: string): Promise<T> {
     try {
       // 检查文件是否存在
       if (!(await this.exists(filePath))) {
@@ -49,7 +51,7 @@ export class FileStorage {
 
       // 尝试解析 JSON
       try {
-        return JSON.parse(content);
+        return JSON.parse(content) as T;
       } catch (parseError) {
         throw new StorageError(
           StorageErrorType.JSON_PARSE_ERROR,
@@ -81,7 +83,7 @@ export class FileStorage {
    * @param options 存储选项
    * @throws StorageError 写入失败或权限错误
    */
-  async write(filePath: string, data: any, options?: StorageOptions): Promise<void> {
+  async write<T>(filePath: string, data: T, options?: StorageOptions): Promise<void> {
     const opts = { ...this.defaultOptions, ...options };
 
     try {
@@ -112,8 +114,10 @@ export class FileStorage {
         // 忽略清理错误
       }
 
-      // 抛出错误
-      if ((error as any).code === 'EACCES') {
+      // 用 NodeJS.ErrnoException 类型安全地访问 code（CR-015）
+      const errno = error as NodeJS.ErrnoException;
+
+      if (errno.code === 'EACCES') {
         throw new StorageError(
           StorageErrorType.PERMISSION_DENIED,
           `Permission denied: ${filePath}`,
@@ -122,7 +126,7 @@ export class FileStorage {
         );
       }
 
-      if ((error as any).code === 'EEXIST') {
+      if (errno.code === 'EEXIST') {
         throw new StorageError(
           StorageErrorType.FILE_EXISTS,
           `File already exists: ${filePath}`,

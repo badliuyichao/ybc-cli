@@ -2,9 +2,11 @@
  * 加密服务
  *
  * 提供 AES-256-GCM 加密解密功能，支持密钥派生和管理
+ *
+ * CR-015（2026-06-17）：用 crypto.Cipheriv / crypto.Decipher 替代 as any
  */
 
-/* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-argument, @typescript-eslint/require-await */
+/* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-argument, @typescript-eslint/require-await */
 
 import * as crypto from 'crypto';
 import * as os from 'os';
@@ -63,8 +65,11 @@ export class EncryptionService {
       // 生成随机 IV
       const iv = crypto.randomBytes(opts.ivLength!);
 
-      // 创建加密器
-      const cipher = crypto.createCipheriv(opts.algorithm!, key, iv) as any;
+      // 创建加密器（CR-015：Node.js @types/node 中 Cipher 基类未暴露 getAuthTag，
+      // 仅 CipherGCM 子接口有，这里 as any 是类型库限制而非真 any）
+      const cipher = crypto.createCipheriv(opts.algorithm!, key, iv) as unknown as crypto.Cipher & {
+        getAuthTag(): Buffer;
+      };
 
       // 加密数据
       let encrypted = cipher.update(data, 'utf8', 'hex');
@@ -111,15 +116,20 @@ export class EncryptionService {
       const authTag = combined.slice(ivLength, ivLength + tagLength);
       const encrypted = combined.slice(ivLength + tagLength);
 
-      // 创建解密器
-      const decipher = crypto.createDecipheriv(opts.algorithm!, key, iv) as any;
+      // 创建解密器（同上：setAuthTag 仅 DecipherGCM 接口有）
+      const decipher = crypto.createDecipheriv(
+        opts.algorithm!,
+        key,
+        iv
+      ) as unknown as crypto.Decipher & {
+        setAuthTag(tag: Buffer): void;
+      };
       decipher.setAuthTag(authTag);
 
-      // 解密数据
-      let decrypted = decipher.update(encrypted, null, 'utf8');
-      decrypted += decipher.final('utf8');
-
-      return decrypted;
+      // 解密数据（CR-015：直接 Buffer 操作避免 decipher.update 的类型歧义）
+      const decryptedBuffers: Buffer[] = [decipher.update(encrypted)];
+      decryptedBuffers.push(decipher.final());
+      return Buffer.concat(decryptedBuffers).toString('utf8');
     } catch (error) {
       throw new EncryptionError(
         EncryptionErrorType.DECRYPTION_FAILED,
@@ -176,7 +186,9 @@ export class EncryptionService {
    */
   async loadKey(): Promise<string> {
     try {
-      const data = await this.storage.read(this.keyFilePath);
+      const data = await this.storage.read<{ key: string; version: string; createdAt: string }>(
+        this.keyFilePath
+      );
       return data.key;
     } catch (error) {
       throw new EncryptionError(

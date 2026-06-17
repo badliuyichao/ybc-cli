@@ -196,7 +196,11 @@ describe('DataCenterService', () => {
       const cacheExists = await storage.exists(tempCachePath);
       expect(cacheExists).toBe(true);
 
-      const cacheData = await storage.read(tempCachePath);
+      const cacheData = await storage.read<{
+        tenantId: string;
+        urls: { gatewayUrl: string; tokenUrl: string };
+        lastUpdate: string;
+      }>(tempCachePath);
 
       // 验证缓存文件格式
       expect(cacheData.tenantId).toBe(tenantId);

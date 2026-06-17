@@ -275,7 +275,7 @@ export class TokenManager {
       }
 
       // 读取缓存
-      const cache = (await this.storage.read(this.cacheFilePath)) as TokenCache;
+      const cache = await this.storage.read<TokenCache>(this.cacheFilePath);
 
       // 验证配置指纹
       const fingerprint = this.getConfigFingerprint(config);

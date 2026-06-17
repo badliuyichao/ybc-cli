@@ -143,14 +143,14 @@ export class ConfigService {
 
     // 从文件读取
     try {
-      const config = await this.storage.read(this.configFilePath);
+      const config = await this.storage.read<Config>(this.configFilePath);
 
       // 向后兼容：支持旧字段名 ak/sk
       const appKey = config.appKey;
       const appSecret = config.appSecret;
 
       // 合并环境变量（环境变量优先）
-      const mergedConfig = {
+      const mergedConfig: Config = {
         ...config,
         tenantId: envConfig.tenantId || config.tenantId,
         appKey: envConfig.appKey || appKey,
@@ -225,8 +225,9 @@ export class ConfigService {
       processedValue = await this.encryption.encrypt(value);
     }
 
-    // 更新配置
-    config[field] = processedValue as any;
+    // 更新配置（CR-015：ConfigField 包含 dataCenter/version/updatedAt 等非 string 字段，
+    // 通过 Partial<Config> 类型转换对齐）
+    (config as unknown as Record<string, string>)[field] = processedValue;
     config.updatedAt = new Date().toISOString();
 
     // 保存配置

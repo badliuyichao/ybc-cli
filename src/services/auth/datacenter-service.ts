@@ -107,7 +107,7 @@ export class DataCenterService {
       const exists = await this.storage.exists(this.cacheFilePath);
       if (!exists) return null;
 
-      const cache = await this.storage.read(this.cacheFilePath);
+      const cache = await this.storage.read<DataCenterCache>(this.cacheFilePath);
       if (cache.tenantId === tenantId && cache.urls) {
         return cache.urls;
       }

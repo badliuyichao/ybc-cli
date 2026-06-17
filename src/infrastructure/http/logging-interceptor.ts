@@ -41,17 +41,18 @@ function maskSensitiveData(str: string): string {
  * @param obj 需要处理的对象
  * @returns 脱敏后的对象
  */
-function maskObject(obj: any): any {
+function maskObject<T>(obj: T): T {
   if (!obj || typeof obj !== 'object') {
     return obj;
   }
 
   if (Array.isArray(obj)) {
-    return obj.map((item) => maskObject(item));
+    return obj.map((item) => maskObject(item)) as unknown as T;
   }
 
-  const masked: any = {};
-  for (const [key, value] of Object.entries(obj)) {
+  // CR-015：用 Record<string, unknown> 替代 any
+  const masked: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(obj as Record<string, unknown>)) {
     const lowerKey = key.toLowerCase();
 
     // 检查是否为敏感字段
@@ -59,14 +60,14 @@ function maskObject(obj: any): any {
 
     if (isSensitive && typeof value === 'string') {
       masked[key] = maskSensitiveData(value);
-    } else if (typeof value === 'object') {
+    } else if (typeof value === 'object' && value !== null) {
       masked[key] = maskObject(value);
     } else {
       masked[key] = value;
     }
   }
 
-  return masked;
+  return masked as T;
 }
 
 /**

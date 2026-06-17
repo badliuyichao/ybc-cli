@@ -221,7 +221,7 @@ describe('EncryptionService', () => {
       await encryptionService.storeKey(key);
 
       // 直接读取文件验证格式
-      const data = await storage.read(keyFilePath);
+      const data = await storage.read<{ key: string; version: string; createdAt: string }>(keyFilePath);
       expect(data).toHaveProperty('key');
       expect(data).toHaveProperty('version');
       expect(data).toHaveProperty('createdAt');

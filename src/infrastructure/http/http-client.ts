@@ -2,11 +2,13 @@
  * HTTP 客户端工厂
  *
  * 负责创建配置好的 Axios 实例，并管理拦截器
+ *
+ * CR-015（2026-06-17）：用 as unknown as ... 双断言替代 as any
  */
 
-import axios, { AxiosInstance } from 'axios';
+import axios, { AxiosInstance, InternalAxiosRequestConfig } from 'axios';
 import * as https from 'https';
-import { HttpClientConfig, HttpRequestConfig, HttpInterceptor } from '../../types/http';
+import { HttpClientConfig, HttpInterceptor } from '../../types/http';
 
 /**
  * HTTP 客户端工厂类
@@ -60,8 +62,12 @@ export class HttpClientFactory {
   private applyInterceptor(client: AxiosInstance, interceptor: HttpInterceptor): void {
     // 添加请求拦截器
     if (interceptor.request) {
+      // 自定义 HttpRequestConfig 与 axios InternalAxiosRequestConfig 类型库差异，
+      // 通过双断言（CR-015）适配
       client.interceptors.request.use(
-        interceptor.request.onFulfilled as any,
+        interceptor.request.onFulfilled as unknown as (
+          config: InternalAxiosRequestConfig
+        ) => InternalAxiosRequestConfig | Promise<InternalAxiosRequestConfig>,
         interceptor.request.onRejected
       );
     }
@@ -69,7 +75,9 @@ export class HttpClientFactory {
     // 添加响应拦截器
     if (interceptor.response) {
       client.interceptors.response.use(
-        interceptor.response.onFulfilled as any,
+        interceptor.response.onFulfilled as unknown as Parameters<
+          AxiosInstance['interceptors']['response']['use']
+        >[0],
         interceptor.response.onRejected
       );
     }
