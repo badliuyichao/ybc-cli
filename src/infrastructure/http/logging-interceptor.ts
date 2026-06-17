@@ -47,7 +47,8 @@ function maskObject<T>(obj: T): T {
   }
 
   if (Array.isArray(obj)) {
-    return obj.map((item) => maskObject(item)) as unknown as T;
+    // 显式标注数组元素类型，避免 generic 协变推断
+    return (obj as unknown[]).map((item: unknown) => maskObject(item)) as unknown as T;
   }
 
   // CR-015：用 Record<string, unknown> 替代 any
@@ -101,6 +102,7 @@ export function createLoggingInterceptor(logger: Logger): HttpInterceptor {
         logger.debug('Request Headers:', JSON.stringify(maskedHeaders, null, 2));
 
         if (config.data) {
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
           const maskedData = maskObject(config.data);
           logger.debug('Request Data:', JSON.stringify(maskedData, null, 2));
         }

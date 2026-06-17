@@ -28,72 +28,81 @@ export function registerConfigInitCommand(program: Command): void {
     .option('--format <format>', '输出格式 (json/table/csv/raw)', 'table')
     .option('--non-interactive', '非交互模式（从参数读取）')
     .helpOption('-h, --help', '显示帮助信息')
-    .action(async (options) => {
-      try {
-        const configService = new ConfigService();
+    .action(
+      async (options: {
+        tenantId?: string;
+        appKey?: string;
+        appSecret?: string;
+        env?: Environment;
+        format?: OutputFormat;
+        nonInteractive?: boolean;
+      }) => {
+        try {
+          const configService = new ConfigService();
 
-        // 检查配置是否已存在
-        if (await configService.exists()) {
-          console.log('⚠️  配置文件已存在');
-          console.log('   如需重新初始化，请先删除配置文件:');
-          console.log(`   ${configService.getConfigFilePath()}`);
-          console.log();
-          console.log('   或使用 "ybc config set" 命令修改配置项');
-          throw new ValidationError('配置文件已存在', { field: 'config' });
-        }
-
-        let config: {
-          tenantId: string;
-          appKey: string;
-          appSecret: string;
-          env: Environment;
-          format: OutputFormat;
-        };
-
-        if (options.nonInteractive) {
-          // 非交互模式：从参数读取
-          if (!options.tenantId || !options.appKey || !options.appSecret) {
-            throw new ValidationError(
-              '非交互模式需要提供 --tenant-id, --app-key 和 --app-secret 参数',
-              { field: 'options' }
-            );
+          // 检查配置是否已存在
+          if (await configService.exists()) {
+            console.log('⚠️  配置文件已存在');
+            console.log('   如需重新初始化，请先删除配置文件:');
+            console.log(`   ${configService.getConfigFilePath()}`);
+            console.log();
+            console.log('   或使用 "ybc config set" 命令修改配置项');
+            throw new ValidationError('配置文件已存在', { field: 'config' });
           }
 
-          config = {
-            tenantId: options.tenantId,
-            appKey: options.appKey,
-            appSecret: options.appSecret,
-            env: options.env || 'sandbox',
-            format: options.format || 'table',
+          let config: {
+            tenantId: string;
+            appKey: string;
+            appSecret: string;
+            env: Environment;
+            format: OutputFormat;
           };
-        } else {
-          // 交互模式：提示用户输入
-          config = await promptConfig();
+
+          if (options.nonInteractive) {
+            // 非交互模式：从参数读取
+            if (!options.tenantId || !options.appKey || !options.appSecret) {
+              throw new ValidationError(
+                '非交互模式需要提供 --tenant-id, --app-key 和 --app-secret 参数',
+                { field: 'options' }
+              );
+            }
+
+            config = {
+              tenantId: options.tenantId,
+              appKey: options.appKey,
+              appSecret: options.appSecret,
+              env: options.env || 'sandbox',
+              format: options.format || 'table',
+            };
+          } else {
+            // 交互模式：提示用户输入
+            config = await promptConfig();
+          }
+
+          // 初始化配置
+          await configService.init(config);
+
+          console.log();
+          console.log('✅ 配置初始化成功！');
+          console.log();
+          console.log('配置信息:');
+          console.log(`  租户ID: ${config.tenantId}`);
+          console.log(`  App Key: ${config.appKey.substring(0, 8)}****`);
+          console.log(`  环境: ${config.env}`);
+          console.log(`  输出格式: ${config.format}`);
+          console.log();
+          console.log(`配置文件路径: ${configService.getConfigFilePath()}`);
+          console.log();
+          console.log('🔒 App Secret 已加密存储');
+          console.log();
+          console.log('下一步：');
+          console.log('  运行 "ybc config show" 查看完整配置');
+          console.log('  运行 "ybc --help" 查看可用命令');
+        } catch (error) {
+          handleErrorAndExit(error instanceof Error ? error : new Error(String(error)));
         }
-
-        // 初始化配置
-        await configService.init(config);
-
-        console.log();
-        console.log('✅ 配置初始化成功！');
-        console.log();
-        console.log('配置信息:');
-        console.log(`  租户ID: ${config.tenantId}`);
-        console.log(`  App Key: ${config.appKey.substring(0, 8)}****`);
-        console.log(`  环境: ${config.env}`);
-        console.log(`  输出格式: ${config.format}`);
-        console.log();
-        console.log(`配置文件路径: ${configService.getConfigFilePath()}`);
-        console.log();
-        console.log('🔒 App Secret 已加密存储');
-        console.log();
-        console.log('下一步：');
-        console.log('  运行 "ybc config show" 查看完整配置');
-        console.log('  运行 "ybc --help" 查看可用命令');
-      } catch (error) {
-        handleErrorAndExit(error instanceof Error ? error : new Error(String(error)));
       }
-    });
+    );
 }
 
 /**
@@ -132,7 +141,7 @@ async function promptConfig(): Promise<{
       process.stdin.setEncoding('utf8');
 
       let password = '';
-      const onData = (char: string) => {
+      const onData = (char: string): void => {
         switch (char) {
           case '\n':
           case '\r':

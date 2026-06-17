@@ -11,6 +11,7 @@ import { Command } from 'commander';
 import { ConfigService } from '../../../services/config/config-service';
 import { ValidationError } from '../../../services/error/errors';
 import { handleErrorAndExit } from '../../../services/error/error-handler';
+import { ConfigField } from '../../../types/config';
 import chalk from 'chalk';
 
 /**
@@ -39,22 +40,24 @@ export function registerConfigSetCommand(program: Command): void {
   format      输出格式 (json/table/csv/raw)
 `
     )
-    .action(async (field, value) => {
+    .action(async (field: string, value: string) => {
       try {
         const configService = new ConfigService();
 
         // 验证字段名
-        const validFields = ['tenantId', 'appKey', 'appSecret', 'env', 'format'];
-        if (!validFields.includes(field)) {
+        const validFields: ConfigField[] = ['tenantId', 'appKey', 'appSecret', 'env', 'format'];
+        if (!(validFields as string[]).includes(field)) {
           console.error(chalk.red(`❌ 无效的字段名: ${field}`));
           console.error();
           console.error('可用字段:');
-          validFields.forEach((f) => {
+          validFields.forEach((f: ConfigField) => {
             console.error(chalk.gray(`  • ${f}`));
           });
           console.error();
           throw new ValidationError(`无效的字段名: ${field}`, { field: 'field', value: field });
         }
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+        const fieldName: ConfigField = field as ConfigField;
 
         // 检查配置文件是否存在
         if (!(await configService.exists())) {
@@ -65,9 +68,9 @@ export function registerConfigSetCommand(program: Command): void {
           console.log();
           // CR-018 修正：env var 命名映射（appKey → YBC_APP_KEY, appSecret → YBC_APP_SECRET）
           const envVarName =
-            field === 'appKey'
+            fieldName === 'appKey'
               ? 'YBC_APP_KEY'
-              : field === 'appSecret'
+              : fieldName === 'appSecret'
                 ? 'YBC_APP_SECRET'
                 : `YBC_${field.toUpperCase()}`;
           console.log('或设置环境变量:');
@@ -86,10 +89,14 @@ export function registerConfigSetCommand(program: Command): void {
         console.log(chalk.bold('📝 修改配置'));
         console.log();
 
-        const oldValue = oldConfig[field as keyof typeof oldConfig];
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
+        const oldValue = oldConfig[fieldName];
         if (oldValue) {
           // CR-014 修正：appSecret 字段旧值标注"（已脱敏显示）"
-          const displayValue = field === 'appSecret' ? `${oldValue}（已脱敏显示）` : oldValue;
+          // 旧值可能是 string | boolean | object，统一用 String() 包装防止 [object Object]
+          const oldValueStr = String(oldValue);
+          const displayValue =
+            fieldName === 'appSecret' ? `${oldValueStr}（已脱敏显示）` : oldValueStr;
           console.log(`  ${chalk.bold('字段')}      : ${field}`);
           console.log(`  ${chalk.bold('旧值')}      : ${displayValue}`);
           console.log(`  ${chalk.bold('新值')}      : ${value}`);
@@ -102,20 +109,21 @@ export function registerConfigSetCommand(program: Command): void {
         console.log();
 
         // 显示字段说明
-        if (field === 'tenantId') {
+        if (fieldName === 'tenantId') {
           console.log(chalk.cyan('💡 设置租户ID（必需）'));
           console.log();
-        } else if (field === 'appKey') {
+        } else if (fieldName === 'appKey') {
           console.log(chalk.cyan('💡 设置 App Key'));
           console.log();
-        } else if (field === 'appSecret') {
+        } else if (fieldName === 'appSecret') {
           console.log(chalk.cyan('💡 设置 App Secret'));
           console.log(chalk.yellow('⚠️  appSecret 将加密存储'));
           console.log();
         }
 
         // 更新配置
-        await configService.setConfig(field, value);
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
+        await configService.setConfig(fieldName, value);
 
         console.log(chalk.green('✅ 配置已更新'));
         console.log();

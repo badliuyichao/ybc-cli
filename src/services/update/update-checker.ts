@@ -23,7 +23,7 @@ export class UpdateChecker {
   static async checkForUpdates(silent: boolean = false): Promise<void> {
     try {
       // 检查缓存，避免频繁请求
-      if (await this.isCheckCacheValid()) {
+      if (this.isCheckCacheValid()) {
         return;
       }
 
@@ -35,7 +35,7 @@ export class UpdateChecker {
       }
 
       // 更新缓存
-      await this.updateCheckCache();
+      this.updateCheckCache();
     } catch {
       // 静默失败，不影响 CLI 使用
     }
@@ -45,9 +45,12 @@ export class UpdateChecker {
    * 获取 npm 上的最新版本号
    */
   private static async getLatestVersion(): Promise<string | null> {
-    const response = await axios.get(`${this.NPM_REGISTRY}/${this.PACKAGE_NAME}/latest`, {
-      timeout: 3000,
-    });
+    const response = await axios.get<{ version?: string }>(
+      `${this.NPM_REGISTRY}/${this.PACKAGE_NAME}/latest`,
+      {
+        timeout: 3000,
+      }
+    );
     return response.data?.version || null;
   }
 
@@ -74,7 +77,9 @@ export class UpdateChecker {
   private static getCurrentVersion(): string {
     try {
       const packageJsonPath = path.join(__dirname, '../../../package.json');
-      const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, 'utf-8'));
+      const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, 'utf-8')) as {
+        version?: string;
+      };
       return packageJson.version || '0.0.0';
     } catch {
       return '0.0.0';
@@ -93,13 +98,15 @@ export class UpdateChecker {
   /**
    * 检查缓存是否有效（24小时内只检查一次）
    */
-  private static async isCheckCacheValid(): Promise<boolean> {
+  private static isCheckCacheValid(): boolean {
     try {
       if (!fs.existsSync(this.CACHE_FILE)) {
         return false;
       }
 
-      const cacheData = JSON.parse(fs.readFileSync(this.CACHE_FILE, 'utf-8'));
+      const cacheData = JSON.parse(fs.readFileSync(this.CACHE_FILE, 'utf-8')) as {
+        lastCheck?: number;
+      };
       const lastCheck = cacheData.lastCheck || 0;
       const now = Date.now();
 
@@ -112,7 +119,7 @@ export class UpdateChecker {
   /**
    * 更新检查缓存
    */
-  private static async updateCheckCache(): Promise<void> {
+  private static updateCheckCache(): void {
     try {
       // 确保目录存在
       if (!fs.existsSync(this.CACHE_DIR)) {

@@ -38,7 +38,7 @@ export function registerConfigShowCommand(program: Command): void {
     .option('--json', '以 JSON 格式输出')
     .option('--reveal', '显示完整的 appSecret（谨慎使用）')
     .helpOption('-h, --help', '显示帮助信息')
-    .action(async (options) => {
+    .action(async (options: { json?: boolean; reveal?: boolean }) => {
       try {
         const configService = new ConfigService();
 

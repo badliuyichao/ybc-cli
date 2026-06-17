@@ -34,7 +34,7 @@ export class OutputManager {
       case 'raw':
         return new RawFormatter();
       default:
-        throw new Error(`Unsupported output format: ${format}`);
+        throw new Error(`Unsupported output format: ${String(format)}`);
     }
   }
 

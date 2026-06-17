@@ -57,7 +57,7 @@ export class ApiHttpWrapper {
     const configuration = await this.apiClientService.getConfiguration();
 
     const httpClient = this.createHttpClient(configuration);
-    const attempt = (token: string) =>
+    const attempt = (token: string): Promise<{ data: T }> =>
       httpClient.request<T>({
         method,
         url: path,

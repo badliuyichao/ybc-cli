@@ -83,7 +83,7 @@ export class ConfigService {
     // 验证环境
     if (config.env && !this.isValidEnvironment(config.env)) {
       throw new ValidationError(
-        `Invalid environment: ${config.env}. Must be "sandbox" or "production"`,
+        `Invalid environment: ${String(config.env)}. Must be "sandbox" or "production"`,
         {
           field: 'env',
           value: config.env,
@@ -94,7 +94,7 @@ export class ConfigService {
     // 验证输出格式
     if (config.format && !this.isValidOutputFormat(config.format)) {
       throw new ValidationError(
-        `Invalid output format: ${config.format}. Must be "json", "table", "csv", or "raw"`,
+        `Invalid output format: ${String(config.format)}. Must be "json", "table", "csv", or "raw"`,
         {
           field: 'format',
           value: config.format,
