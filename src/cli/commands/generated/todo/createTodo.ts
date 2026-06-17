@@ -5,16 +5,18 @@
  * 此文件由命令生成器自动生成，请勿手动修改
  *
  * 待办-001（2026-06-17）：使用 ApiHttpWrapper + handleErrorAndExit 模式
+ * 待办-004（2026-06-17）：ApiClientService 注入（单进程内复用 cachedGatewayUrl）
  */
 
 import { Command } from 'commander';
 import { ApiHttpWrapper } from '../../../../services/api/api-http-wrapper';
+import { ApiClientService } from '../../../../services/api/api-client-service';
 import { OutputManager } from '../../../../cli/output';
 import { handleErrorAndExit, BusinessError } from '../../../../services/error';
 
 const outputManager = new OutputManager();
 
-export function registerTodoApiCreateTodoCommand(parent: Command) {
+export function registerTodoApiCreateTodoCommand(parent: Command, apiClientService: ApiClientService) {
   parent
     .command('create')
     .description('创建待办')
@@ -24,7 +26,7 @@ export function registerTodoApiCreateTodoCommand(parent: Command) {
     .option('--todoCreateRequest <todoCreateRequest>', 'todoCreateRequest (JSON 字符串)')
     .action(async (options) => {
       try {
-        const wrapper = new ApiHttpWrapper();
+        const wrapper = new ApiHttpWrapper(apiClientService);
         const data = await wrapper.call({
           method: 'POST',
           path: '/todo/create',

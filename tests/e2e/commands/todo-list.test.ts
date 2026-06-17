@@ -6,6 +6,7 @@
 
 import { Command } from 'commander';
 import { registerTodoApiListTodosCommand } from '../../../src/cli/commands/generated/todo/listTodos';
+import { ApiClientService } from '../../../src/services/api/api-client-service';
 
 // Mock axios 模块
 jest.mock('axios');
@@ -21,7 +22,7 @@ describe('Todo List Command E2E', () => {
       .option('--format <format>', '输出格式', 'json');
 
     // 注册命令
-    registerTodoApiListTodosCommand(program);
+    registerTodoApiListTodosCommand(program, new ApiClientService());
   });
 
   it('should register todo list command correctly', () => {

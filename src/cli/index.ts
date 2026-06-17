@@ -4,6 +4,7 @@ import { registerConfigCommand } from './commands/config';
 import { registerStaffApiCommands } from './commands/generated/staff';
 import { registerTodoApiCommands } from './commands/generated/todo';
 import { UpdateChecker } from '../services/update';
+import { ApiClientService } from '../services/api/api-client-service';
 
 /**
  * CLI 启动函数
@@ -25,12 +26,15 @@ export function bootstrap(): Promise<void> {
     // 注册命令
     registerConfigCommand(program);
 
+    // 待办-004：ApiClientService 单例注入（单进程内 cachedGatewayUrl 复用）
+    const apiClientService = new ApiClientService();
+
     // 注册生成的业务命令
     const staffCommand = program.command('staff').description('人员管理');
-    registerStaffApiCommands(staffCommand);
+    registerStaffApiCommands(staffCommand, apiClientService);
 
     const todoCommand = program.command('todo').description('待办事项管理');
-    registerTodoApiCommands(todoCommand);
+    registerTodoApiCommands(todoCommand, apiClientService);
 
     try {
       // 解析命令行参数

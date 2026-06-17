@@ -6,6 +6,7 @@
 
 import { Command } from 'commander';
 import { registerStaffApiQueryStaffCommand } from '../../../src/cli/commands/generated/staff/queryStaff';
+import { ApiClientService } from '../../../src/services/api/api-client-service';
 
 // Mock axios 模块
 jest.mock('axios');
@@ -21,7 +22,7 @@ describe('Staff Query Command E2E', () => {
       .option('--format <format>', '输出格式', 'json');
 
     // 注册命令
-    registerStaffApiQueryStaffCommand(program);
+    registerStaffApiQueryStaffCommand(program, new ApiClientService());
   });
 
   it('should register staff query command correctly', () => {
@@ -29,7 +30,7 @@ describe('Staff Query Command E2E', () => {
     const queryCommand = commands.find(cmd => cmd.name() === 'query');
 
     expect(queryCommand).toBeDefined();
-    expect(queryCommand?.description()).toBe('查询员工详情（简版员工专用）');
+    expect(queryCommand?.description()).toBe('查询员工详情');
   });
 
   it('should have correct options for query command', () => {

@@ -22,9 +22,8 @@ import { AuthError, BusinessError, NetworkError } from '@/services/error/errors'
  * 创建 ApiHttpWrapper 子类，注入 Mock ApiClientService
  */
 function createWrapperWithMock(mockApiClientService: jest.Mocked<ApiClientService>): ApiHttpWrapper {
-  const wrapper = new ApiHttpWrapper();
-  (wrapper as any).apiClientService = mockApiClientService;
-  return wrapper;
+  // 待办-004：构造函数注入 apiClientService
+  return new ApiHttpWrapper(mockApiClientService);
 }
 
 /**

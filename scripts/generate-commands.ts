@@ -271,16 +271,18 @@ function generateCommandFile(className: string, method: ApiMethod): string {
  * 此文件由命令生成器自动生成，请勿手动修改
  *
  * 待办-001（2026-06-17）：使用 ApiHttpWrapper + handleErrorAndExit 模式
+ * 待办-004（2026-06-17）：ApiClientService 注入（单进程内复用 cachedGatewayUrl）
  */
 
 import { Command } from 'commander';
 import { ApiHttpWrapper } from '../../../../services/api/api-http-wrapper';
+import { ApiClientService } from '../../../../services/api/api-client-service';
 import { OutputManager } from '../../../../cli/output';
 import { handleErrorAndExit, BusinessError } from '../../../../services/error';
 
 const outputManager = new OutputManager();
 
-export function ${functionName}(parent: Command) {
+export function ${functionName}(parent: Command, apiClientService: ApiClientService) {
   parent
     .command('${commandName}')
     .description('${method.summary}')
@@ -288,7 +290,7 @@ ${globalOptionsCode}
 ${optionsCode}
     .action(async (options) => {
       try {
-        const wrapper = new ApiHttpWrapper();
+        const wrapper = new ApiHttpWrapper(apiClientService);
         const data = await wrapper.call(${callArgs});
 
         // CR-016: 统一业务成功码判断
@@ -323,7 +325,7 @@ function generateIndexFile(className: string, methods: ApiMethod[]): string {
   const registrations = methods
     .map(
       (method) =>
-        `  register${className}${method.name.charAt(0).toUpperCase() + method.name.slice(1)}Command(command);`
+        `  register${className}${method.name.charAt(0).toUpperCase() + method.name.slice(1)}Command(command, apiClientService);`
     )
     .join('\n');
 
@@ -332,12 +334,15 @@ function generateIndexFile(className: string, methods: ApiMethod[]): string {
  *
  * 自动生成自 ${className}
  * 此文件由命令生成器自动生成，请勿手动修改
+ *
+ * 待办-004（2026-06-17）：ApiClientService 注入
  */
 
 import { Command } from 'commander';
+import { ApiClientService } from '../../../../services/api/api-client-service';
 ${imports}
 
-export function register${className}Commands(command: Command) {
+export function register${className}Commands(command: Command, apiClientService: ApiClientService) {
 ${registrations}
 }
 `;

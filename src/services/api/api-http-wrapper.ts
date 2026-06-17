@@ -9,6 +9,9 @@
  *    - 4xx → 业务错误（BusinessError）
  *    - 5xx → 网络错误（NetworkError）
  *    - 超时/连接失败 → 网络错误（NetworkError）
+ *
+ * 待办-004（2026-06-17）：构造函数注入 ApiClientService
+ * 解决原 new ApiClientService() 单例无法跨命令共享 cachedGatewayUrl 的问题
  */
 
 import axios, { AxiosInstance, AxiosError } from 'axios';
@@ -32,15 +35,21 @@ export interface ApiRequest {
  *
  * 用法：
  * ```typescript
- * const wrapper = new ApiHttpWrapper();
- * const data = await wrapper.call({ method: 'GET', path: '/api/xxx', params: { id: '123' } });
+ * // 单例场景（推荐）：在 bootstrap() 创建一次，注入到所有命令
+ * const apiClientService = new ApiClientService();
+ * const wrapper = new ApiHttpWrapper(apiClientService);
+ * const data = await wrapper.call({ method: 'GET', path: '/api/xxx' });
  * ```
  */
 export class ApiHttpWrapper {
   private apiClientService: ApiClientService;
 
-  constructor() {
-    this.apiClientService = new ApiClientService();
+  /**
+   * 构造函数
+   * @param apiClientService ApiClientService 实例（依赖注入，单例复用）
+   */
+  constructor(apiClientService: ApiClientService) {
+    this.apiClientService = apiClientService;
   }
 
   /**

@@ -22,6 +22,7 @@ import { ConfigService } from '@/services/config/config-service';
 import { TokenManager } from '@/services/auth/token-manager';
 import { FileStorage } from '@/infrastructure/storage/file-storage';
 import { ApiHttpWrapper } from '@/services/api/api-http-wrapper';
+import { ApiClientService } from '@/services/api/api-client-service';
 import { ErrorHandler } from '@/services/error/error-handler';
 import { ExitCode } from '@/services/error/codes';
 import { AuthError, BusinessError, NetworkError } from '@/services/error/errors';
@@ -71,7 +72,8 @@ describe('Phase 1 Full Flow Integration (重写于 2026-06-17)', () => {
     // 隔离数据中心缓存
     (tokenManager as any).dataCenterService.cacheFilePath = path.join(tempDir, 'datacenter.json');
 
-    wrapper = new ApiHttpWrapper();
+    // 待办-004：构造函数注入 ApiClientService
+    wrapper = new ApiHttpWrapper(new ApiClientService());
   });
 
   afterEach(async () => {

@@ -17,6 +17,7 @@ import * as os from 'os';
 import axios from 'axios';
 import MockAdapter from 'axios-mock-adapter';
 import { ApiHttpWrapper } from '@/services/api/api-http-wrapper';
+import { ApiClientService } from '@/services/api/api-client-service';
 import { FileStorage } from '@/infrastructure/storage/file-storage';
 import { ConfigService } from '@/services/config/config-service';
 import {
@@ -74,7 +75,8 @@ describe('HTTP 客户端集成测试 (ApiHttpWrapper)', () => {
     process.env.YBC_APP_SECRET = 'test-app-secret-12345678901234';
     process.env.YBC_ENV = 'sandbox';
 
-    wrapper = new ApiHttpWrapper();
+    // 待办-004：构造函数注入 ApiClientService
+    wrapper = new ApiHttpWrapper(new ApiClientService());
 
     // 标准 mock（数据中心 + Token）
     setupAuthMocks(mockAxios);
