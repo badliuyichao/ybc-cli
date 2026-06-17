@@ -10,7 +10,7 @@
 - 🚀 **自动 Token 管理** - 自动处理 token 的获取、缓存和刷新
 - 📋 **OpenAPI 驱动** - 命令从 OpenAPI 规范自动生成，支持 300+ API 端点
 - 🎨 **多格式输出** - 支持表格、JSON、CSV、Raw 四种输出格式
-- 🔐 **安全存储** - SK 使用 AES-256-GCM 加密存储
+- 🔐 **安全存储** - appSecret 使用 AES-256-GCM 加密存储
 - 🔧 **灵活配置** - 支持多环境、多租户配置
 
 ## 安装
@@ -41,7 +41,7 @@ ybc config set env sandbox
 ybc --help
 
 # 查看配置
-ybc config list
+ybc config show
 
 # 查询员工信息
 ybc staff query --name "张三"
@@ -109,10 +109,9 @@ ybc staff query --format csv > result.csv
 ```
 ybc
 ├── config      # 配置管理
-│   ├── set     # 设置配置项
-│   ├── get     # 获取配置项
-│   ├── list    # 列出所有配置
-│   └── delete  # 删除配置项
+│   ├── init    # 交互式初始化
+│   ├── show    # 查看配置（敏感字段脱敏）
+│   └── set     # 设置单个配置项
 ├── staff       # 员工管理域
 │   ├── query   # 查询员工
 │   ├── enable  # 启用员工
@@ -196,7 +195,7 @@ ybc staff query --help
 - `1` - 通用错误（CLI 解析错误）
 - `4` - 业务错误（API 返回错误）
 - `5` - 网络错误
-- `6` - 鉴权错误（AK/SK 无效）
+- `6` - 鉴权错误（appKey/appSecret 无效）
 
 ## 文档
 

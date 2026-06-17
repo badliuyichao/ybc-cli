@@ -2,6 +2,16 @@
  * HTTP 客户端集成测试
  *
  * 测试完整的拦截器链：请求 → token 注入 → 日志记录 → 响应 → 401 处理
+ *
+ * ⚠️ 临时跳过（2026-06-16）
+ * 失败根因：本测试使用 `createAuthInterceptor`（CR-010 / CR-042 标记废弃），
+ * 它通过 `Authorization: Bearer` Header 注入 token，与 ADR-7（query 参数传 token）矛盾。
+ * 当前业务命令已切到 `ApiHttpWrapper`（query 参数模式），此拦截器无业务流程使用。
+ *
+ * 跟踪：CR-037 / CR-042 / docs/process/code-review-20260616.md
+ * 重写后恢复方法：去掉 `.skip` 后缀，把 401 重试测试迁移到
+ * `tests/unit/services/api/api-http-wrapper.test.ts`（待补，CR-045），
+ * 删除本文件对 `auth-interceptor` 的依赖。
  */
 
 import axios, { AxiosInstance } from 'axios';

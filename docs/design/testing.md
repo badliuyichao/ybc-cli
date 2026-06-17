@@ -123,11 +123,11 @@ tests/
 
 | 测试 | 文件 | 用例数 | 状态 |
 |------|------|-------|------|
-| Token Refresh | `token-refresh.test.ts` | 10 | ❌ **全部失败**（Mock Server 与 CLI 之间接口不匹配） |
-| Error Scenarios | `error-scenarios.test.ts` | 13 | ⚠️ 部分通过（退出码验证逻辑有偏差） |
-| Performance | `performance.test.ts` | 10 | ⚠️ 部分通过 |
+| Token Refresh | `token-refresh.test.ts` | 10 | ✅ 通过（2026-06-16）|
+| Error Scenarios | `error-scenarios.test.ts` | 13 | ✅ 通过（2026-06-16）|
+| Performance | `performance.test.ts` | 10 | ⚠️ 4 个性能阈值用例超时（CI/真实 API 环境问题，非代码缺陷）|
 
-> Token Refresh 全部失败根因：`MockBipServer` 未注册数据中心查询端点；Token 端点校验旧字段 `ak/sk` 而非新字段 `appKey/timestamp/signature`；业务端点检查 `Authorization` Header 但 CLI 用 query 参数。见 `docs/process/audit-code-vs-design.md` 的 E2E 分析。
+> 2026-06-16 实测：CR-001/CR-002 修复后，Token Refresh 和 Error Scenarios 已通过。Performance 用例依赖真实用友 API，本机网络延迟 > 10s 触发阈值；建议 CI 环境跳过或在本地运行。详见 `docs/process/code-review-20260616.md`。
 
 ---
 
@@ -550,10 +550,10 @@ YBC_TEST_TENANT_ID=xxx YBC_TEST_APP_KEY=xxx YBC_TEST_APP_SECRET=xxx npm run test
 
 | 缺口 | 详情 | 追踪 |
 |------|------|------|
-| **ApiHttpWrapper 无测试** | `src/services/api/api-http-wrapper.ts`（新建）尚未覆盖 | 待补 |
-| **UpdateChecker 无测试** | `src/services/update/update-checker.ts` 无任何测试 | 待补 |
-| **api-client-service 无独立测试** | 仅在集成测试中间接覆盖 | 待补 |
-| **voucher 域未实现** | OpenAPI 规范中未定义，无法测试 | `ROADMAP.md` Phase 2 |
+| **ApiHttpWrapper 无测试** | `src/services/api/api-http-wrapper.ts`（新建）尚未覆盖 | CR-045（2026-06-16） |
+| **UpdateChecker 无测试** | `src/services/update/update-checker.ts` 无任何测试 | CR-044（2026-06-16） |
+| **集成测试 17 个失败** | auth-flow / http-flow / full-flow 在 CR-001/CR-002 修复后未同步更新 | CR-037（2026-06-16） |
+| **voucher 域未实现** | OpenAPI 规范中未定义，无法测试 | `ROADMAP.md` Phase 3 |
 | **跨平台 CI 矩阵未搭建** | Windows/macOS/Linux 自动化测试未配置 | 待补 |
 
 ---

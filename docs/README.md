@@ -35,6 +35,8 @@ docs/
 | **了解架构与鉴权** | [`design/architecture.md`](design/architecture.md) |
 | **看待办与下一步** | 项目根目录 [`ROADMAP.md`](../ROADMAP.md) |
 | **看版本历史** | 项目根目录 [`CHANGELOG.md`](../CHANGELOG.md) |
+| **看代码审查记录** | [`process/code-review-20260612.md`](process/code-review-20260612.md)（初轮）<br>[`process/code-review-20260616.md`](process/code-review-20260616.md)（补充轮） |
+| **看代码与设计一致性审计** | [`process/audit-code-vs-design.md`](process/audit-code-vs-design.md) |
 | **看用友官方 API 原文** | [`design/ref/`](design/ref/) |
 | **排查问题** | [`guides/usage.md`](guides/usage.md) → 「故障排查」一节 |
 | **查看 Phase 1 历史** | [`archive/phase1/`](archive/phase1/) |

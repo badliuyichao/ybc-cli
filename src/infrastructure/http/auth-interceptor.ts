@@ -1,6 +1,11 @@
 /**
  * 鉴权拦截器
  *
+ * @deprecated 自 2026-06-12 起标记废弃（CR-010 / CR-042）。
+ * 与 ADR-7（query 参数传 token）矛盾，业务命令已切到 `ApiHttpWrapper`。
+ * 仅保留用于向后兼容，新代码请直接使用 `ApiHttpWrapper`。
+ * 跟踪：docs/process/code-review-20260616.md CR-042
+ *
  * 负责自动注入 Token 和处理 401 错误重试
  */
 
@@ -13,6 +18,7 @@ import { TokenConfig } from '../../types/auth';
 /**
  * 创建鉴权拦截器
  *
+ * @deprecated 请改用 `ApiHttpWrapper`（src/services/api/api-http-wrapper.ts）。
  * @param tokenManager Token 管理器
  * @param tokenConfig Token 配置
  * @param client Axios 客户端实例（可选，用于重试）

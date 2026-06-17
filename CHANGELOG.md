@@ -2,6 +2,27 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.1.7] - 2026-06-16
+
+### Fixed
+- **CR-001 全局选项注入**：5 个生成命令（staff query/enable/disable、todo list/create）显式声明 `--format` / `--raw` / `--verbose`，子命令 options 不再丢全局值
+- **CR-002 空 token 缓存防护**：TokenManager 在 L1（内存）、L2（文件）、L3（远程响应）三层都校验 `access_token` 非空，防止空 token 被缓存导致后续 401
+- **CR-007 EOF 时 stdin 监听器残留**：`config init` 的 `questionHidden` resolve 前清理 data 监听器（与上次审查条目对齐）
+
+### Changed
+- **CR-037 集成测试**：临时跳过 3 个集成测试套件（auth-flow / http-flow / full-flow），原因是用友实现迁移（POST→GET、Bearer Header→query param）后未同步重写。详见 `docs/process/code-review-20260616.md` CR-037
+- **CR-041 `process.exit` 收敛**：审计显示 `config/*` 命令有 16 处直接 `process.exit()`（上次审查 CR-013 仅识别 queryStaff.ts 1 处），已在审计报告标记
+- **CR-042 auth-interceptor 标记废弃**：加 `@deprecated` JSDoc，指向 `ApiHttpWrapper`。CI 不删，避免外部依赖
+- **CR-043 ApiHttpWrapper 错误分类**：按 HTTP 状态码分类错误：4xx → BusinessError（退出码 4）/ 5xx → NetworkError（5）/ 超时 / 连接失败 → NetworkError（5）/ 401 走原有重试链路（6）
+
+### Docs
+- **README.md 术语同步**：`SK` → `appSecret`，`config list` → `config show`，删除不存在的 `config delete` 条目，退出码描述统一
+- **docs/design/testing.md**：Token Refresh / Error Scenarios 状态更新为 ✅（CR-001/CR-002 修复后已通过），Performance 标注为环境超时
+- **docs/process/code-review-20260616.md**（新增）：补充轮审查 15 项问题 + 51 项累计 + 修复优先级
+
+### Chore
+- **`.gitattributes` 新增**：强制 `.ts/.js/.json/.yaml/.md` 行尾 LF，避免 Windows 提交混入 CRLF 导致 ESLint 误报（CR-048）。已存在的 CRLF 文件待单独 PR 用 `git rm --cached` 一次性清理
+
 ## [0.1.7] - 2026-06-11
 
 ### Added

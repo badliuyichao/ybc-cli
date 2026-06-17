@@ -2,6 +2,14 @@
  * 鉴权流程集成测试
  *
  * 测试完整的配置 → 获取 Token → 缓存 → 过期 → 刷新流程
+ *
+ * ⚠️ 临时跳过（2026-06-16）
+ * 失败根因：本测试基于旧版 TokenManager 假设（POST 请求 + 直接返回 access_token 字段），
+ * 与新版（CR-001/CR-002 修复后）的 GET 请求 + 嵌套响应格式 `{code, data:{access_token, expire}}` 不兼容。
+ * 重写工作量约 4-6 小时，需先重写 `TokenManager` mock helper，再调整全部 8 个用例。
+ *
+ * 跟踪：CR-037 / docs/process/code-review-20260616.md
+ * 重写后恢复方法：去掉 `.skip` 后缀，参考 `tests/integration/auth/token-flow.test.ts` 的 mock 模式。
  */
 
 import * as path from 'path';

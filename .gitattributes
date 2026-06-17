@@ -1,0 +1,25 @@
+# 强制 LF 行尾，避免 Windows 提交混入 CRLF 导致 ESLint/Prettier 误报
+# 参考：docs/process/code-review-20260616.md CR-048
+
+# 源代码
+*.ts          text eol=lf
+*.js          text eol=lf
+*.json        text eol=lf
+*.yaml        text eol=lf
+*.yml         text eol=lf
+
+# 配置文件
+*.config.js   text eol=lf
+.eslintrc.js  text eol=lf
+.prettierrc   text eol=lf
+
+# 文档
+*.md          text eol=lf
+
+# 脚本
+*.sh          text eol=lf eol=crlf
+
+# 二进制文件无需转换
+*.png         binary
+*.jpg         binary
+*.gif         binary
