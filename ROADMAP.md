@@ -736,6 +736,16 @@ describe('Real API E2E', () => {
   - 通过闭包/context 注入到命令
 - **工作量**：约 2 小时
 - **价值**：⭐⭐⭐⭐（首命令后跳过数据中心查询，加速 200ms+）
+- **完成时间**：2026-06-17（commit `58e1dca`）
+- **完成内容**：
+  - `ApiHttpWrapper` 构造函数改为接收 `apiClientService: ApiClientService`
+  - 移除内部 `new ApiClientService()`
+  - 同步更新生成器模板：生成的命令接受 `apiClientService` 参数并注入 wrapper
+  - 重生成 5 个命令 + 2 个 index 文件
+  - `bootstrap()` 创建 `apiClientService` 单例并注入到所有注册
+  - 4 个测试文件更新（api-http-wrapper.test.ts / http-flow.test.ts / full-flow.test.ts / staff-query.test.ts / todo-list.test.ts）
+  - TypeScript 编译 0 错误
+  - 全套测试 34/35 套件通过（4 失败 = performance 网络超时，与本次重构无关）
 
 #### 待办-005：补 update-checker 退出码契约测试
 - **跟踪**：CR-044 增强
